@@ -1,0 +1,3 @@
+-- down migration
+ALTER TABLE users DROP COLUMN reset_token;
+ALTER TABLE users DROP COLUMN reset_token_expires_at;

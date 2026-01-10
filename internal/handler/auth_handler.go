@@ -27,6 +27,8 @@ func (h *AuthHandler) SetupRoutes() *mux.Router {
 	// public routes
 	r.HandleFunc("/api/auth/register", h.Register).Methods("POST")
 	r.HandleFunc("/api/auth/login", h.Login).Methods("POST")
+	r.HandleFunc("/api/auth/password-reset", h.RequestPasswordReset).Methods("POST")
+	r.HandleFunc("/api/auth/password-reset/confirm", h.ResetPassword).Methods("POST")
 
 	// protected routes
 	protected := r.PathPrefix("/api").Subrouter()
@@ -95,6 +97,42 @@ func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) Health(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
+	var req domain.PasswordResetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	resp, err := h.authService.RequestPasswordReset(r.Context(), &req)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to process password reset request")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, resp)
+}
+
+func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var req domain.PasswordResetConfirmRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	resp, err := h.authService.ResetPassword(r.Context(), &req)
+	if err != nil {
+		if err == domain.ErrInvalidResetToken || err == domain.ErrResetTokenExpired {
+			respondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		respondWithError(w, http.StatusInternalServerError, "Failed to reset password")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, resp)
 }
 
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {

@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -93,4 +96,87 @@ func (s *AuthService) Login(ctx context.Context, req *domain.LoginRequest) (*dom
 
 func (s *AuthService) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	return s.userRepo.GetByID(ctx, id)
+}
+
+func (s *AuthService) RequestPasswordReset(ctx context.Context, req *domain.PasswordResetRequest) (*domain.PasswordResetResponse, error) {
+	// get user by email
+	user, err := s.userRepo.GetByEmail(ctx, req.Email)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			// Don't reveal if email exists or not for security
+			return &domain.PasswordResetResponse{
+				Message: "If the email exists, a password reset link has been sent",
+			}, nil
+		}
+		return nil, err
+	}
+
+	// generate reset token
+	token, err := s.generateResetToken()
+	if err != nil {
+		return nil, err
+	}
+
+	// set expiration time (24 hours from now)
+	expiresAt := time.Now().Add(24 * time.Hour)
+
+	// update user with reset token
+	err = s.userRepo.UpdateResetToken(ctx, user.ID, token, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Send email with reset link
+	// For now, just return success message
+	// In production, you would send an email with a link like:
+	// https://yourapp.com/reset-password?token={token}
+
+	return &domain.PasswordResetResponse{
+		Message: "If the email exists, a password reset link has been sent",
+	}, nil
+}
+
+func (s *AuthService) ResetPassword(ctx context.Context, req *domain.PasswordResetConfirmRequest) (*domain.PasswordResetResponse, error) {
+	// get user by reset token
+	user, err := s.userRepo.GetByResetToken(ctx, req.Token)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return nil, domain.ErrInvalidResetToken
+		}
+		return nil, err
+	}
+
+	// check if token is expired
+	if user.ResetTokenExpiresAt == nil || user.ResetTokenExpiresAt.Before(time.Now()) {
+		return nil, domain.ErrResetTokenExpired
+	}
+
+	// hash new password
+	hashedPassword, err := password.Hash(req.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	// update password and clear reset token
+	err = s.userRepo.UpdatePassword(ctx, user.ID, hashedPassword)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.userRepo.ClearResetToken(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.PasswordResetResponse{
+		Message: "Password has been reset successfully",
+	}, nil
+}
+
+func (s *AuthService) generateResetToken() (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
 }

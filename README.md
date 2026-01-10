@@ -5,6 +5,7 @@ A modern, production-ready authentication service built with Go, featuring JWT-b
 ## 🚀 Features
 
 - **User Registration & Authentication**: Secure user registration and login with JWT tokens
+- **Password Reset**: Secure password reset functionality with email tokens
 - **Password Security**: bcrypt password hashing with proper salt rounds
 - **Clean Architecture**: Separation of concerns with domain, service, repository, and handler layers
 - **Middleware Support**: 
@@ -55,10 +56,13 @@ g-auth/
 │   │   └── postgres/
 │   │       └── user_repository.go # PostgreSQL implementation
 │   └── service/
-│       └── auth_service.go      # Business logic layer
+│       ├── auth_service.go      # Business logic layer
+│       └── auth_service_test.go # Unit tests for auth service
 ├── migrations/
 │   ├── 001_create_users_table.up.sql
-│   └── 001_create_users_table.down.sql
+│   ├── 001_create_users_table.down.sql
+│   ├── 002_add_password_reset_fields.up.sql
+│   └── 002_add_password_reset_fields.down.sql
 ├── pkg/
 │   ├── jwt/
 │   │   └── jwt.go               # JWT token management
@@ -114,8 +118,15 @@ This will:
 # Ensure PostgreSQL is running
 psql -U postgres -c "CREATE DATABASE authdb;"
 
-# Run migrations
+# Run all migrations
 make migrate-up
+```
+
+Or run migrations individually:
+
+```bash
+make migrate-001-up  # Create users table
+make migrate-002-up  # Add password reset fields
 ```
 
 ### 4. Install Dependencies
@@ -265,15 +276,28 @@ go test -v ./internal/service/
 ## 🔧 Available Make Commands
 
 ```bash
-make run           # Run the service locally
-make build         # Build the binary to ./bin/auth-service
-make test          # Run all tests
-make migrate-up    # Run database migrations
-make migrate-down  # Rollback database migrations
-make docker-up     # Start PostgreSQL in Docker
-make docker-down   # Stop and remove PostgreSQL container
-make docker-build  # Build Docker image for the service
-make docker-run    # Run the service in Docker
+# Development
+make help              # Show all available commands
+make dev               # Set up complete development environment
+make run               # Run the service locally
+make build             # Build the binary to ./bin/auth-service
+make test              # Run all tests
+make clean             # Clean build artifacts
+
+# Database Migrations
+make migrate-up        # Run all database migrations
+make migrate-down      # Rollback all database migrations
+make migrate-001-up    # Run migration 001 (users table) up
+make migrate-001-down  # Run migration 001 (users table) down
+make migrate-002-up    # Run migration 002 (password reset) up
+make migrate-002-down  # Run migration 002 (password reset) down
+
+# Docker
+make docker-up         # Start PostgreSQL in Docker
+make docker-down       # Stop and remove PostgreSQL container
+make docker-migrate    # Run migrations in Docker container
+make docker-build      # Build Docker image for the service
+make docker-run        # Run the service in Docker
 ```
 
 ## 🐳 Docker Deployment
