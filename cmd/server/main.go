@@ -40,7 +40,7 @@ func main() {
 	}
 
 	// initialize JWT manager
-	jwtManager := jwt.NewJWTManager(cfg.JWTSecret, cfg.JWTExpiration)
+	jwtManager := jwt.NewJWTManager(cfg.JWTSecret, cfg.JWTExpiration, cfg.RefreshTokenExpiration)
 
 	// initialize repositories
 	userRepo := postgres.NewUserRepository(db)

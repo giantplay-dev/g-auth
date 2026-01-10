@@ -54,15 +54,28 @@ func (s *AuthService) Register(ctx context.Context, req *domain.RegisterRequest)
 		return nil, err
 	}
 
-	// generate token
+	// generate tokens
 	token, err := s.jwtManager.Generate(user.ID, user.Email)
 	if err != nil {
 		return nil, err
 	}
 
+	refreshToken, err := s.jwtManager.GenerateRefreshToken(user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// store refresh token
+	refreshExpiresAt := time.Now().Add(7 * 24 * time.Hour) // 7 days
+	err = s.userRepo.UpdateRefreshToken(ctx, user.ID, refreshToken, refreshExpiresAt)
+	if err != nil {
+		return nil, err
+	}
+
 	return &domain.AuthResponse{
-		Token: token,
-		User:  *user,
+		Token:        token,
+		RefreshToken: refreshToken,
+		User:         *user,
 	}, nil
 
 }
@@ -82,15 +95,71 @@ func (s *AuthService) Login(ctx context.Context, req *domain.LoginRequest) (*dom
 		return nil, domain.ErrInvalidCredentials
 	}
 
-	// generate token
+	// generate tokens
 	token, err := s.jwtManager.Generate(user.ID, user.Email)
 	if err != nil {
 		return nil, err
 	}
 
+	refreshToken, err := s.jwtManager.GenerateRefreshToken(user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// store refresh token
+	refreshExpiresAt := time.Now().Add(7 * 24 * time.Hour) // 7 days
+	err = s.userRepo.UpdateRefreshToken(ctx, user.ID, refreshToken, refreshExpiresAt)
+	if err != nil {
+		return nil, err
+	}
+
 	return &domain.AuthResponse{
-		Token: token,
-		User:  *user,
+		Token:        token,
+		RefreshToken: refreshToken,
+		User:         *user,
+	}, nil
+}
+
+func (s *AuthService) RefreshToken(ctx context.Context, req *domain.RefreshTokenRequest) (*domain.AuthResponse, error) {
+	// verify refresh token
+	_, err := s.jwtManager.VerifyRefreshToken(req.RefreshToken)
+	if err != nil {
+		return nil, domain.ErrInvalidCredentials
+	}
+
+	// get user by refresh token from database
+	user, err := s.userRepo.GetByRefreshToken(ctx, req.RefreshToken)
+	if err != nil {
+		return nil, domain.ErrInvalidCredentials
+	}
+
+	// check if refresh token is expired
+	if user.RefreshTokenExpiresAt != nil && user.RefreshTokenExpiresAt.Before(time.Now()) {
+		return nil, domain.ErrInvalidCredentials
+	}
+
+	// generate new tokens
+	token, err := s.jwtManager.Generate(user.ID, user.Email)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, err := s.jwtManager.GenerateRefreshToken(user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// update refresh token in database
+	refreshExpiresAt := time.Now().Add(7 * 24 * time.Hour) // 7 days
+	err = s.userRepo.UpdateRefreshToken(ctx, user.ID, refreshToken, refreshExpiresAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.AuthResponse{
+		Token:        token,
+		RefreshToken: refreshToken,
+		User:         *user,
 	}, nil
 }
 

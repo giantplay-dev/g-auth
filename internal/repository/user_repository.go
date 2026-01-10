@@ -17,4 +17,7 @@ type UserRepository interface {
 	GetByResetToken(ctx context.Context, token string) (*domain.User, error)
 	UpdatePassword(ctx context.Context, userID uuid.UUID, hashedPassword string) error
 	ClearResetToken(ctx context.Context, userID uuid.UUID) error
+	UpdateRefreshToken(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) error
+	GetByRefreshToken(ctx context.Context, token string) (*domain.User, error)
+	ClearRefreshToken(ctx context.Context, userID uuid.UUID) error
 }

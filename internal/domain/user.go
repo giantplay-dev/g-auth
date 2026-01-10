@@ -16,14 +16,16 @@ var (
 )
 
 type User struct {
-	ID                  uuid.UUID  `json:"id"`
-	Email               string     `json:"email"`
-	Password            string     `json:"-"`
-	Name                string     `json:"name"`
-	ResetToken          *string    `json:"-"`
-	ResetTokenExpiresAt *time.Time `json:"-"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	ID                    uuid.UUID  `json:"id"`
+	Email                 string     `json:"email"`
+	Password              string     `json:"-"`
+	Name                  string     `json:"name"`
+	ResetToken            *string    `json:"-"`
+	ResetTokenExpiresAt   *time.Time `json:"-"`
+	RefreshToken          *string    `json:"-"`
+	RefreshTokenExpiresAt *time.Time `json:"-"`
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             time.Time  `json:"updated_at"`
 }
 
 type LoginRequest struct {
@@ -37,9 +39,14 @@ type RegisterRequest struct {
 	Name     string `json:"name"`
 }
 
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
 type AuthResponse struct {
-	Token string `json:"token"`
-	User  User   `json:"user"`
+	Token        string `json:"token"`
+	RefreshToken string `json:"refresh_token"`
+	User         User   `json:"user"`
 }
 
 type PasswordResetRequest struct {

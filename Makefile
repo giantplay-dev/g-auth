@@ -16,6 +16,8 @@ help:
 	@echo "  migrate-001-down    - Run migration 001 down"
 	@echo "  migrate-002-up      - Run migration 002 up"
 	@echo "  migrate-002-down    - Run migration 002 down"
+	@echo "  migrate-003-up      - Run migration 003 up"
+	@echo "  migrate-003-down    - Run migration 003 down"
 	@echo "  docker-up           - Start PostgreSQL in Docker"
 	@echo "  docker-down         - Stop and remove PostgreSQL Docker container"
 	@echo "  docker-migrate      - Run migrations in Docker container"
@@ -46,7 +48,13 @@ migrate-002-up:
 migrate-002-down:
 	psql $(DATABASE_URL) -f migrations/002_add_password_reset_fields.down.sql
 
-migrate-all-up: migrate-001-up migrate-002-up
+migrate-003-up:
+	psql $(DATABASE_URL) -f migrations/003_add_refresh_token_fields.up.sql
+
+migrate-003-down:
+	psql $(DATABASE_URL) -f migrations/003_add_refresh_token_fields.down.sql
+
+migrate-all-up: migrate-001-up migrate-002-up migrate-003-up
 	@echo "All migrations applied successfully"
 
 migrate-all-down: migrate-002-down migrate-001-down

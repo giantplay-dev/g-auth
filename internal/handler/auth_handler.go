@@ -27,6 +27,7 @@ func (h *AuthHandler) SetupRoutes() *mux.Router {
 	// public routes
 	r.HandleFunc("/api/auth/register", h.Register).Methods("POST")
 	r.HandleFunc("/api/auth/login", h.Login).Methods("POST")
+	r.HandleFunc("/api/auth/refresh", h.RefreshToken).Methods("POST")
 	r.HandleFunc("/api/auth/password-reset", h.RequestPasswordReset).Methods("POST")
 	r.HandleFunc("/api/auth/password-reset/confirm", h.ResetPassword).Methods("POST")
 
@@ -77,6 +78,26 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		respondWithError(w, http.StatusInternalServerError, "Failed to login")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, resp)
+}
+
+func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
+	var req domain.RefreshTokenRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	resp, err := h.authService.RefreshToken(r.Context(), &req)
+	if err != nil {
+		if err == domain.ErrInvalidCredentials {
+			respondWithError(w, http.StatusUnauthorized, err.Error())
+			return
+		}
+		respondWithError(w, http.StatusInternalServerError, "Failed to refresh token")
 		return
 	}
 

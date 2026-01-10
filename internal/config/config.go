@@ -9,11 +9,12 @@ import (
 )
 
 type Config struct {
-	Env           string
-	Port          string
-	DatabaseURL   string
-	JWTSecret     string
-	JWTExpiration time.Duration
+	Env                    string
+	Port                   string
+	DatabaseURL            string
+	JWTSecret              string
+	JWTExpiration          time.Duration
+	RefreshTokenExpiration time.Duration
 }
 
 func Load() *Config {
@@ -22,11 +23,12 @@ func Load() *Config {
 	}
 
 	return &Config{
-		Env:           getEnv("ENV", "development"),
-		Port:          getEnv("PORT", "8080"),
-		DatabaseURL:   getEnv("DATABASE_URL", "postgres://user:pass@localhost:5432/dbname"),
-		JWTSecret:     getEnv("JWT_SECRET", "supersecretkey"),
-		JWTExpiration: 1 * time.Minute,
+		Env:                    getEnv("ENV", "development"),
+		Port:                   getEnv("PORT", "8080"),
+		DatabaseURL:            getEnv("DATABASE_URL", "postgres://user:pass@localhost:5432/dbname"),
+		JWTSecret:              getEnv("JWT_SECRET", "supersecretkey"),
+		JWTExpiration:          15 * time.Minute,   // Access token: 15 minutes
+		RefreshTokenExpiration: 7 * 24 * time.Hour, // Refresh token: 7 days
 	}
 }
 

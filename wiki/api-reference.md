@@ -101,6 +101,7 @@ Content-Type: application/json
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTIzZTQ1NjctZTg5Yi0xMmQzLWE0NTYtNDI2NjE0MTc0MDAwIiwiZXhwIjoxNzM2NTA1NjAwfQ.abc123...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTIzZTQ1NjctZTg5Yi0xMmQzLWE0NTYtNDI2NjE0MTc0MDAwIiwiZXhwIjoxNzM3MTEwNDAwfQ.def456...",
   "user": {
     "id": "123e4567-e89b-12d3-a456-426614174000",
     "email": "user@example.com",
@@ -115,7 +116,8 @@ Content-Type: application/json
 
 | Field | Type | Description |
 |-------|------|-------------|
-| token | string | JWT authentication token |
+| token | string | JWT access token (15 minutes expiration) |
+| refresh_token | string | JWT refresh token (7 days expiration) |
 | user.id | string (UUID) | Unique user identifier |
 | user.email | string | User's email address |
 | user.name | string | User's full name |
@@ -205,6 +207,7 @@ Content-Type: application/json
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTIzZTQ1NjctZTg5Yi0xMmQzLWE0NTYtNDI2NjE0MTc0MDAwIiwiZXhwIjoxNzM2NTA1NjAwfQ.abc123...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTIzZTQ1NjctZTg5Yi0xMmQzLWE0NTYtNDI2NjE0MTc0MDAwIiwiZXhwIjoxNzM3MTEwNDAwfQ.def456...",
   "user": {
     "id": "123e4567-e89b-12d3-a456-426614174000",
     "email": "user@example.com",
@@ -253,6 +256,7 @@ curl -X POST http://localhost:8080/api/auth/login \
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
     "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
     "email": "john.doe@example.com",
@@ -265,7 +269,103 @@ curl -X POST http://localhost:8080/api/auth/login \
 
 ---
 
-### 4. Request Password Reset
+### 4. Refresh Token
+
+Refresh an access token using a valid refresh token.
+
+**Endpoint**: `POST /api/auth/refresh`
+
+**Authentication**: None required
+
+**Request Headers**:
+```
+Content-Type: application/json
+```
+
+**Request Body**:
+```json
+{
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Request Fields**:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| refresh_token | string | Yes | Valid refresh token obtained from login/register |
+
+**Success Response** (200 OK):
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTIzZTQ1NjctZTg5Yi0xMmQzLWE0NTYtNDI2NjE0MTc0MDAwIiwiZXhwIjoxNzM2NTA1NjAwfQ.abc123...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTIzZTQ1NjctZTg5Yi0xMmQzLWE0NTYtNDI2NjE0MTc0MDAwIiwiZXhwIjoxNzM3MTEwNDAwfQ.def456...",
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "name": "John Doe",
+    "created_at": "2026-01-10T10:00:00Z",
+    "updated_at": "2026-01-10T10:00:00Z"
+  }
+}
+```
+
+**Response Fields**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| token | string | New JWT access token (15 minutes expiration) |
+| refresh_token | string | New JWT refresh token (7 days expiration) |
+| user.id | string (UUID) | Unique user identifier |
+| user.email | string | User's email address |
+| user.name | string | User's full name |
+| user.created_at | string (ISO 8601) | Account creation timestamp |
+| user.updated_at | string (ISO 8601) | Last update timestamp |
+
+**Error Responses**:
+
+**400 Bad Request** - Invalid request format:
+```json
+{
+  "error": "Invalid request payload"
+}
+```
+
+**401 Unauthorized** - Invalid or expired refresh token:
+```json
+{
+  "error": "invalid credentials"
+}
+```
+
+**Example Request**:
+
+```bash
+curl -X POST http://localhost:8080/api/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{
+    "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }'
+```
+
+**Example Response**:
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "email": "user@example.com",
+    "name": "User Name",
+    "created_at": "2026-01-10T15:30:00Z",
+    "updated_at": "2026-01-10T15:30:00Z"
+  }
+}
+```
+
+---
+
+### 5. Request Password Reset
 
 Request a password reset token to be sent to the user's email.
 

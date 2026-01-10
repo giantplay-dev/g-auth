@@ -23,7 +23,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 
 		tokenString := strings.Replace(authHeader, "Bearer ", "", 1)
 
-		jwtManager := jwt.NewJWTManager(config.Load().JWTSecret, config.Load().JWTExpiration)
+		jwtManager := jwt.NewJWTManager(config.Load().JWTSecret, config.Load().JWTExpiration, config.Load().RefreshTokenExpiration)
 		claims, err := jwtManager.Verify(tokenString)
 		if err != nil {
 			http.Error(w, "Invalid token", http.StatusUnauthorized)
