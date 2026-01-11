@@ -143,116 +143,6 @@ make run
 
 The service will start on `http://localhost:8080`
 
-## 📚 API Documentation
-
-### Base URL
-```
-http://localhost:8080/api
-```
-
-### Endpoints
-
-#### 1. Health Check
-```http
-GET /health
-```
-
-**Response:**
-```json
-{
-  "status": "ok"
-}
-```
-
-#### 2. Register User
-```http
-POST /api/auth/register
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "SecureP@ssw0rd",
-  "name": "John Doe"
-}
-```
-
-**Success Response (201 Created):**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "123e4567-e89b-12d3-a456-426614174000",
-    "email": "user@example.com",
-    "name": "John Doe",
-    "created_at": "2026-01-10T10:00:00Z",
-    "updated_at": "2026-01-10T10:00:00Z"
-  }
-}
-```
-
-**Error Response (409 Conflict):**
-```json
-{
-  "error": "user already exists"
-}
-```
-
-#### 3. Login
-```http
-POST /api/auth/login
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "SecureP@ssw0rd"
-}
-```
-
-**Success Response (200 OK):**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "123e4567-e89b-12d3-a456-426614174000",
-    "email": "user@example.com",
-    "name": "John Doe",
-    "created_at": "2026-01-10T10:00:00Z",
-    "updated_at": "2026-01-10T10:00:00Z"
-  }
-}
-```
-
-**Error Response (401 Unauthorized):**
-```json
-{
-  "error": "invalid credentials"
-}
-```
-
-#### 4. Get Current User (Protected)
-```http
-GET /api/me
-Authorization: Bearer <jwt-token>
-```
-
-**Success Response (200 OK):**
-```json
-{
-  "id": "123e4567-e89b-12d3-a456-426614174000",
-  "email": "user@example.com",
-  "name": "John Doe",
-  "created_at": "2026-01-10T10:00:00Z",
-  "updated_at": "2026-01-10T10:00:00Z"
-}
-```
-
-**Error Response (401 Unauthorized):**
-```json
-{
-  "error": "missing or invalid authorization header"
-}
-```
-
 ## 🧪 Testing
 
 Run all tests:
@@ -372,8 +262,8 @@ For issues and questions, please open an issue in the repository.
 
 ## 🗺️ Roadmap
 
-- [ ] Add password reset functionality
-- [ ] Implement refresh token mechanism
+- [x] Add password reset functionality
+- [x] Implement refresh token mechanism
 - [ ] Add email verification
 - [ ] Implement role-based access control (RBAC)
 - [ ] Add OAuth2 integration (Google, GitHub)
