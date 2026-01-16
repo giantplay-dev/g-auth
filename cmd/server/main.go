@@ -57,15 +57,23 @@ func main() {
 
 	// initialize repositories
 	userRepo := postgres.NewUserRepository(db)
+	roleRepo := postgres.NewRoleRepository(db)
 
 	// initialize services
 	authService := service.NewAuthService(userRepo, jwtManager, emailMailer)
+	authService.SetRoleRepository(roleRepo)
+	roleService := service.NewRoleService(roleRepo, userRepo)
 
-	// initialize HTTP handler
-	handler := handler.NewAuthHandler(authService)
+	// initialize HTTP handlers
+	authHandler := handler.NewAuthHandler(authService)
+	roleHandler := handler.NewRoleHandler(roleService)
 
 	// setup router with middleware
-	router := handler.SetupRoutes()
+	router := authHandler.SetupRoutes()
+
+	// add role management routes
+	roleHandler.SetupRoutes(router, userRepo)
+
 	router.Use(middleware.RateLimitMiddleware(cfg))
 	router.Use(middleware.TraceMiddleware)
 	router.Use(middleware.LoggingMiddleware(appLogger))

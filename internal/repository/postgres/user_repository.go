@@ -12,11 +12,15 @@ import (
 )
 
 type userRepository struct {
-	db *sql.DB
+	db       *sql.DB
+	roleRepo *RoleRepository
 }
 
 func NewUserRepository(db *sql.DB) *userRepository {
-	return &userRepository{db: db}
+	return &userRepository{
+		db:       db,
+		roleRepo: NewRoleRepository(db),
+	}
 }
 
 func (r *userRepository) Create(ctx context.Context, user *domain.User) error {
@@ -130,6 +134,13 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*domain.
 		}
 	}
 
+	// Load user roles
+	roles, err := r.roleRepo.GetUserRoles(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	user.Roles = roles
+
 	return user, nil
 }
 
@@ -214,6 +225,13 @@ func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Use
 			user.MFACodeExpiresAt = &expiresAt
 		}
 	}
+
+	// Load user roles
+	roles, err := r.roleRepo.GetUserRoles(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	user.Roles = roles
 
 	return user, nil
 }

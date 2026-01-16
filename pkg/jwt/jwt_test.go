@@ -41,6 +41,23 @@ func TestJWTManager_Verify_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, userID, claims.UserID)
 	assert.Equal(t, email, claims.Email)
+	assert.Empty(t, claims.Roles)
+}
+
+func TestJWTManager_GenerateWithRoles(t *testing.T) {
+	manager := NewJWTManager("test-secret", time.Hour, 24*time.Hour)
+	userID := uuid.New()
+	email := "test@example.com"
+	roles := []string{"admin", "user"}
+
+	token, err := manager.GenerateWithRoles(userID, email, roles)
+	assert.NoError(t, err)
+
+	claims, err := manager.Verify(token)
+	assert.NoError(t, err)
+	assert.Equal(t, userID, claims.UserID)
+	assert.Equal(t, email, claims.Email)
+	assert.Equal(t, roles, claims.Roles)
 }
 
 func TestJWTManager_Verify_InvalidToken(t *testing.T) {

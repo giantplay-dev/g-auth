@@ -187,3 +187,157 @@ func TestResendVerificationResponse_Structure(t *testing.T) {
 
 	assert.Equal(t, "Verification email sent", resp.Message)
 }
+func TestUser_HasRole(t *testing.T) {
+	user := User{
+		Roles: []Role{
+			{Name: RoleAdmin},
+			{Name: RoleUser},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		roleName string
+		want     bool
+	}{
+		{
+			name:     "has admin role",
+			roleName: RoleAdmin,
+			want:     true,
+		},
+		{
+			name:     "has user role",
+			roleName: RoleUser,
+			want:     true,
+		},
+		{
+			name:     "does not have moderator role",
+			roleName: RoleModerator,
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := user.HasRole(tt.roleName)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestUser_HasPermission(t *testing.T) {
+	user := User{
+		Roles: []Role{
+			{
+				Name: RoleAdmin,
+				Permissions: []Permission{
+					{Resource: "user", Action: "read"},
+					{Resource: "user", Action: "write"},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		resource string
+		action   string
+		want     bool
+	}{
+		{
+			name:     "has user read permission",
+			resource: "user",
+			action:   "read",
+			want:     true,
+		},
+		{
+			name:     "has user write permission",
+			resource: "user",
+			action:   "write",
+			want:     true,
+		},
+		{
+			name:     "does not have user delete permission",
+			resource: "user",
+			action:   "delete",
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := user.HasPermission(tt.resource, tt.action)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestUser_HasPermissionByName(t *testing.T) {
+	user := User{
+		Roles: []Role{
+			{
+				Name: RoleAdmin,
+				Permissions: []Permission{
+					{Name: PermissionUserRead},
+					{Name: PermissionUserWrite},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name           string
+		permissionName string
+		want           bool
+	}{
+		{
+			name:           "has user read permission",
+			permissionName: PermissionUserRead,
+			want:           true,
+		},
+		{
+			name:           "has user write permission",
+			permissionName: PermissionUserWrite,
+			want:           true,
+		},
+		{
+			name:           "does not have user delete permission",
+			permissionName: PermissionUserDelete,
+			want:           false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := user.HasPermissionByName(tt.permissionName)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestUser_GetRoleNames(t *testing.T) {
+	user := User{
+		Roles: []Role{
+			{Name: RoleAdmin},
+			{Name: RoleUser},
+			{Name: RoleModerator},
+		},
+	}
+
+	roleNames := user.GetRoleNames()
+
+	assert.Len(t, roleNames, 3)
+	assert.Contains(t, roleNames, RoleAdmin)
+	assert.Contains(t, roleNames, RoleUser)
+	assert.Contains(t, roleNames, RoleModerator)
+}
+
+func TestUser_GetRoleNames_Empty(t *testing.T) {
+	user := User{
+		Roles: []Role{},
+	}
+
+	roleNames := user.GetRoleNames()
+
+	assert.Len(t, roleNames, 0)
+}

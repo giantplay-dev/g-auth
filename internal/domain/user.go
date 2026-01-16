@@ -63,8 +63,48 @@ type User struct {
 	MFAEnabled                 bool       `json:"mfa_enabled"`
 	MFACode                    *string    `json:"-"`
 	MFACodeExpiresAt           *time.Time `json:"-"`
+	Roles                      []Role     `json:"roles"`
 	CreatedAt                  time.Time  `json:"created_at"`
 	UpdatedAt                  time.Time  `json:"updated_at"`
+}
+
+// HasRole checks if a user has a specific role
+func (u *User) HasRole(roleName string) bool {
+	for _, role := range u.Roles {
+		if role.Name == roleName {
+			return true
+		}
+	}
+	return false
+}
+
+// HasPermission checks if a user has a specific permission
+func (u *User) HasPermission(resource, action string) bool {
+	for _, role := range u.Roles {
+		if role.HasPermission(resource, action) {
+			return true
+		}
+	}
+	return false
+}
+
+// HasPermissionByName checks if a user has a specific permission by name
+func (u *User) HasPermissionByName(permissionName string) bool {
+	for _, role := range u.Roles {
+		if role.HasPermissionByName(permissionName) {
+			return true
+		}
+	}
+	return false
+}
+
+// GetRoleNames returns a list of role names for the user
+func (u *User) GetRoleNames() []string {
+	roleNames := make([]string, len(u.Roles))
+	for i, role := range u.Roles {
+		roleNames[i] = role.Name
+	}
+	return roleNames
 }
 
 type LoginRequest struct {

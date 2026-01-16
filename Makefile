@@ -1,4 +1,4 @@
-.PHONY: run build clean test coverage mod-tidy migrate-up migrate-down migrate-001-up migrate-001-down migrate-002-up migrate-002-down migrate-003-up migrate-003-down migrate-004-up migrate-004-down migrate-005-up migrate-005-down migrate-006-up migrate-006-down docker-up docker-down docker-migrate docker-build docker-run help dev
+.PHONY: run build clean test coverage mod-tidy migrate-up migrate-down migrate-001-up migrate-001-down migrate-002-up migrate-002-down migrate-003-up migrate-003-down migrate-004-up migrate-004-down migrate-005-up migrate-005-down migrate-006-up migrate-006-down migrate-007-up migrate-007-down docker-up docker-down docker-migrate docker-build docker-run help dev
 
 # Load environment variables
 include .env
@@ -27,6 +27,8 @@ help:
 	@echo "  migrate-005-down    - Run migration 005 down"
 	@echo "  migrate-006-up      - Run migration 006 up"
 	@echo "  migrate-006-down    - Run migration 006 down"
+	@echo "  migrate-007-up      - Run migration 007 up"
+	@echo "  migrate-007-down    - Run migration 007 down"
 	@echo "  docker-up           - Start PostgreSQL in Docker"
 	@echo "  docker-down         - Stop and remove PostgreSQL Docker container"
 	@echo "  docker-migrate      - Run migrations in Docker container"
@@ -94,10 +96,16 @@ migrate-006-up:
 migrate-006-down:
 	psql $(DATABASE_URL) -f migrations/006_add_mfa_fields.down.sql
 
-migrate-up: migrate-001-up migrate-002-up migrate-003-up migrate-004-up migrate-005-up migrate-006-up
+migrate-007-up:
+	psql $(DATABASE_URL) -f migrations/007_add_rbac_tables.up.sql
+
+migrate-007-down:
+	psql $(DATABASE_URL) -f migrations/007_add_rbac_tables.down.sql
+
+migrate-up: migrate-001-up migrate-002-up migrate-003-up migrate-004-up migrate-005-up migrate-006-up migrate-007-up
 	@echo "All migrations applied successfully"
 
-migrate-down: migrate-006-down migrate-005-down migrate-004-down migrate-003-down migrate-002-down migrate-001-down
+migrate-down: migrate-007-down migrate-006-down migrate-005-down migrate-004-down migrate-003-down migrate-002-down migrate-001-down
 	@echo "All migrations rolled back successfully"
 
 # Docker commands
@@ -126,6 +134,7 @@ docker-migrate: docker-up
 	docker exec -i auth-postgres psql -U postgres -d g-auth -f /dev/stdin < migrations/004_add_email_verification_fields.up.sql
 	docker exec -i auth-postgres psql -U postgres -d g-auth -f /dev/stdin < migrations/005_add_account_lockout_fields.up.sql
 	docker exec -i auth-postgres psql -U postgres -d g-auth -f /dev/stdin < migrations/006_add_mfa_fields.up.sql
+	docker exec -i auth-postgres psql -U postgres -d g-auth -f /dev/stdin < migrations/007_add_rbac_tables.up.sql
 	@echo "Migrations completed successfully"
 
 docker-build:

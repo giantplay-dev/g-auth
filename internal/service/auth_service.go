@@ -19,6 +19,7 @@ import (
 
 type AuthService struct {
 	userRepo   repository.UserRepository
+	roleRepo   repository.RoleRepository
 	jwtManager *jwt.JWTManager
 	mailer     mailer.Mailer
 }
@@ -29,6 +30,10 @@ func NewAuthService(userRepo repository.UserRepository, jwtManager *jwt.JWTManag
 		jwtManager: jwtManager,
 		mailer:     mailer,
 	}
+}
+
+func (s *AuthService) SetRoleRepository(roleRepo repository.RoleRepository) {
+	s.roleRepo = roleRepo
 }
 
 func (s *AuthService) Register(ctx context.Context, req *domain.RegisterRequest) (*domain.RegisterResponse, error) {
@@ -77,6 +82,15 @@ func (s *AuthService) Register(ctx context.Context, req *domain.RegisterRequest)
 	if err != nil {
 		// log error but don't fail registration
 		// in production, you might want to handle this differently
+	}
+
+	// assign default "user" role to new user
+	if s.roleRepo != nil {
+		defaultRole, err := s.roleRepo.GetRoleByName(ctx, domain.RoleUser)
+		if err == nil && defaultRole != nil {
+			_ = s.roleRepo.AssignRoleToUser(ctx, user.ID, defaultRole.ID)
+		}
+		// Ignore errors in role assignment to not fail registration
 	}
 
 	return &domain.RegisterResponse{
@@ -172,7 +186,7 @@ func (s *AuthService) Login(ctx context.Context, req *domain.LoginRequest) (*dom
 	}
 
 	// generate tokens
-	token, err := s.jwtManager.Generate(user.ID, user.Email)
+	token, err := s.jwtManager.GenerateWithRoles(user.ID, user.Email, user.GetRoleNames())
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +229,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, req *domain.RefreshToken
 	}
 
 	// generate new tokens
-	token, err := s.jwtManager.Generate(user.ID, user.Email)
+	token, err := s.jwtManager.GenerateWithRoles(user.ID, user.Email, user.GetRoleNames())
 	if err != nil {
 		return nil, err
 	}
@@ -526,7 +540,7 @@ func (s *AuthService) VerifyMFACode(ctx context.Context, req *domain.MFAVerifyRe
 	}
 
 	// generate tokens
-	token, err := s.jwtManager.Generate(user.ID, user.Email)
+	token, err := s.jwtManager.GenerateWithRoles(user.ID, user.Email, user.GetRoleNames())
 	if err != nil {
 		return nil, err
 	}
