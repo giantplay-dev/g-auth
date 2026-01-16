@@ -191,15 +191,16 @@ go test -v ./internal/service/
 ```bash
 # Development
 make help              # Show all available commands
-make dev               # Set up complete development environment
-make run               # Run the service locally
-make build             # Build the binary to ./bin/auth-service
-make test              # Run all tests
+make run               # Run the application
+make build             # Build the application
 make clean             # Clean build artifacts
+make test              # Run all tests
+make coverage          # Run tests with coverage report
+make mod-tidy          # Tidy and verify go modules
 
 # Database Migrations
-make migrate-up        # Run all database migrations
-make migrate-down      # Rollback all database migrations
+make migrate-up        # Run all up migrations
+make migrate-down      # Run all down migrations
 make migrate-001-up    # Run migration 001 (users table) up
 make migrate-001-down  # Run migration 001 (users table) down
 make migrate-002-up    # Run migration 002 (password reset) up
@@ -213,10 +214,11 @@ make migrate-005-down  # Run migration 005 (account lockout) down
 
 # Docker
 make docker-up         # Start PostgreSQL in Docker
-make docker-down       # Stop and remove PostgreSQL container
+make docker-down       # Stop and remove PostgreSQL Docker container
 make docker-migrate    # Run migrations in Docker container
-make docker-build      # Build Docker image for the service
-make docker-run        # Run the service in Docker
+make docker-build      # Build Docker image
+make docker-run        # Run service in Docker
+make dev               # Set up complete development environment
 ```
 
 ## 🐳 Docker Deployment

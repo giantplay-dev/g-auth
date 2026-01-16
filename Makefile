@@ -1,4 +1,4 @@
-.PHONY: run build test coverage migrate-up migrate-down migrate-001-up migrate-001-down migrate-002-up migrate-002-down migrate-003-up migrate-003-down migrate-004-up migrate-004-down migrate-005-up migrate-005-down docker-up docker-down docker-migrate docker-build docker-run clean help dev mod-tidy
+.PHONY: run build clean test coverage mod-tidy migrate-up migrate-down migrate-001-up migrate-001-down migrate-002-up migrate-002-down migrate-003-up migrate-003-down migrate-004-up migrate-004-down migrate-005-up migrate-005-down docker-up docker-down docker-migrate docker-build docker-run help dev
 
 # Load environment variables
 include .env
@@ -9,6 +9,7 @@ help:
 	@echo "Available commands:"
 	@echo "  run                 - Run the application"
 	@echo "  build               - Build the application"
+	@echo "  clean               - Clean build artifacts"
 	@echo "  test                - Run all tests"
 	@echo "  coverage            - Run tests with coverage report"
 	@echo "  mod-tidy            - Tidy and verify go modules"
@@ -29,7 +30,6 @@ help:
 	@echo "  docker-migrate      - Run migrations in Docker container"
 	@echo "  docker-build        - Build Docker image"
 	@echo "  docker-run          - Run service in Docker"
-	@echo "  clean               - Clean build artifacts"
 	@echo "  dev                 - Set up development environment"
 
 run:
@@ -37,6 +37,11 @@ run:
 
 build:
 	go build -o bin/auth-service cmd/server/main.go
+
+# Clean build artifacts
+clean:
+	rm -rf bin/
+	go clean
 
 test:
 	go test -v ./...
@@ -81,15 +86,11 @@ migrate-005-up:
 migrate-005-down:
 	psql $(DATABASE_URL) -f migrations/005_add_account_lockout_fields.down.sql
 
-migrate-all-up: migrate-001-up migrate-002-up migrate-003-up migrate-004-up migrate-005-up
+migrate-up: migrate-001-up migrate-002-up migrate-003-up migrate-004-up migrate-005-up
 	@echo "All migrations applied successfully"
 
-migrate-all-down: migrate-005-down migrate-004-down migrate-003-down migrate-002-down migrate-001-down
+migrate-down: migrate-005-down migrate-004-down migrate-003-down migrate-002-down migrate-001-down
 	@echo "All migrations rolled back successfully"
-
-# Legacy aliases for backward compatibility
-migrate-up: migrate-all-up
-migrate-down: migrate-all-down
 
 # Docker commands
 docker-up:
@@ -118,19 +119,12 @@ docker-migrate: docker-up
 	docker exec -i auth-postgres psql -U postgres -d g-auth -f /dev/stdin < migrations/005_add_account_lockout_fields.up.sql
 	@echo "Migrations completed successfully"
 
-# Build and run service in Docker
 docker-build:
 	docker build -t auth-service:latest -f deploy/Dockerfile .
 
 docker-run:
 	docker run --network host --env-file .env -e DATABASE_URL=postgres://postgres:postgres@localhost:5432/g-auth?sslmode=disable auth-service:latest
 
-# Clean build artifacts
-clean:
-	rm -rf bin/
-	go clean
-
-# Development workflow
 dev: docker-up docker-migrate
 	@echo "Development environment is ready!"
 	@echo "Run 'make run' to start the service"
