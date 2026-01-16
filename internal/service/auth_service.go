@@ -12,18 +12,21 @@ import (
 	"g-auth/internal/domain"
 	"g-auth/internal/repository"
 	"g-auth/pkg/jwt"
+	"g-auth/pkg/mailer"
 	"g-auth/pkg/password"
 )
 
 type AuthService struct {
 	userRepo   repository.UserRepository
 	jwtManager *jwt.JWTManager
+	mailer     mailer.Mailer
 }
 
-func NewAuthService(userRepo repository.UserRepository, jwtManager *jwt.JWTManager) *AuthService {
+func NewAuthService(userRepo repository.UserRepository, jwtManager *jwt.JWTManager, mailer mailer.Mailer) *AuthService {
 	return &AuthService{
 		userRepo:   userRepo,
 		jwtManager: jwtManager,
+		mailer:     mailer,
 	}
 }
 
@@ -195,10 +198,16 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, req *domain.Pass
 		return nil, err
 	}
 
-	// TODO: Send email with reset link
-	// For now, just return success message
-	// In production, you would send an email with a link like:
-	// https://yourapp.com/reset-password?token={token}
+	// send email with reset link
+	resetLink := "http://localhost:8080/reset-password?token=" + token // TODO: Make this configurable
+	emailBody := s.buildPasswordResetEmail(user.Name, resetLink)
+	err = s.mailer.SendEmail(user.Email, "Password Reset Request", emailBody)
+	if err != nil {
+		// Log the error but don't fail the request for security reasons
+		// In production, you might want to retry or alert administrators
+		// For now, we'll just log it (assuming logger is available)
+		// TODO: Add proper logging
+	}
 
 	return &domain.PasswordResetResponse{
 		Message: "If the email exists, a password reset link has been sent",
@@ -248,4 +257,46 @@ func (s *AuthService) generateResetToken() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(bytes), nil
+}
+
+func (s *AuthService) buildPasswordResetEmail(name, resetLink string) string {
+	return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Password Reset</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #4CAF50;">Password Reset Request</h2>
+        
+        <p>Hello ` + name + `,</p>
+        
+        <p>You have requested to reset your password. Please click the link below to reset your password:</p>
+        
+        <p style="text-align: center; margin: 30px 0;">
+            <a href="` + resetLink + `" 
+               style="background-color: #4CAF50; color: white; padding: 12px 24px; 
+                      text-decoration: none; border-radius: 4px; display: inline-block;">
+                Reset Password
+            </a>
+        </p>
+        
+        <p><strong>Important:</strong> This link will expire in 24 hours for security reasons.</p>
+        
+        <p>If you didn't request this password reset, please ignore this email. Your password will remain unchanged.</p>
+        
+        <p>If the button above doesn't work, you can copy and paste this link into your browser:</p>
+        <p style="word-break: break-all; color: #666;">` + resetLink + `</p>
+        
+        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+        
+        <p style="color: #666; font-size: 12px;">
+            This is an automated email. Please do not reply to this message.
+        </p>
+    </div>
+</body>
+</html>
+`
 }

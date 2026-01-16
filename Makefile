@@ -66,9 +66,12 @@ migrate-down: migrate-all-down
 
 # Docker commands
 docker-up:
+	docker stop auth-postgres || true
+	docker rm auth-postgres || true
 	docker run --name auth-postgres \
+		-e POSTGRES_USER=postgres \
 		-e POSTGRES_PASSWORD=postgres \
-		-e POSTGRES_DB=authdb \
+		-e POSTGRES_DB=g-auth \
 		-p 5432:5432 \
 		-d postgres:15
 	@echo "Waiting for PostgreSQL to start..."
@@ -81,8 +84,9 @@ docker-down:
 
 docker-migrate: docker-up
 	@echo "Running migrations in Docker container..."
-	docker exec -i auth-postgres psql -U postgres -d authdb -f /dev/stdin < migrations/001_create_users_table.up.sql
-	docker exec -i auth-postgres psql -U postgres -d authdb -f /dev/stdin < migrations/002_add_password_reset_fields.up.sql
+	docker exec -i auth-postgres psql -U postgres -d g-auth -f /dev/stdin < migrations/001_create_users_table.up.sql
+	docker exec -i auth-postgres psql -U postgres -d g-auth -f /dev/stdin < migrations/002_add_password_reset_fields.up.sql
+	docker exec -i auth-postgres psql -U postgres -d g-auth -f /dev/stdin < migrations/003_add_refresh_token_fields.up.sql
 	@echo "Migrations completed successfully"
 
 # Build and run service in Docker
@@ -90,7 +94,7 @@ docker-build:
 	docker build -t auth-service:latest .
 
 docker-run:
-	docker run -p 8080:8080 --env-file .env auth-service:latest
+	docker run --network host --env-file .env -e DATABASE_URL=postgres://postgres:postgres@localhost:5432/g-auth?sslmode=disable auth-service:latest
 
 # Clean build artifacts
 clean:

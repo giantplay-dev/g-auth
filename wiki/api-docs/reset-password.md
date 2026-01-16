@@ -2,7 +2,7 @@
 
 ## Overview
 
-The password reset feature allows users to reset their password through a two-step process: requesting a reset token via email and then confirming the reset with the new password.
+The password reset feature allows users to reset their password through a two-step process: requesting a reset token via email and then confirming the reset with the new password. When a password reset is requested, an email containing a reset link is sent to the user's registered email address.
 
 ## Base Information
 
@@ -44,7 +44,7 @@ Content-Type: application/json
 }
 ```
 
-**Note**: For security reasons, the response is the same whether the email exists or not.
+**Note**: For security reasons, the response is the same whether the email exists or not. If SMTP is not configured, the system will use a no-operation mailer and the reset link will not be sent (useful for development/testing).
 
 **Error Responses**:
 

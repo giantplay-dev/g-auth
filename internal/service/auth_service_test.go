@@ -11,6 +11,7 @@ import (
 
 	"g-auth/internal/domain"
 	"g-auth/pkg/jwt"
+	"g-auth/pkg/mailer"
 )
 
 // MockUserRepository is a mock implementation of UserRepository
@@ -83,7 +84,8 @@ func (m *MockUserRepository) ClearRefreshToken(ctx context.Context, userID uuid.
 func TestAuthService_RequestPasswordReset(t *testing.T) {
 	mockRepo := new(MockUserRepository)
 	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
-	service := NewAuthService(mockRepo, jwtManager)
+	mockMailer := mailer.NewNoOpMailer()
+	service := NewAuthService(mockRepo, jwtManager, mockMailer)
 
 	ctx := context.Background()
 	req := &domain.PasswordResetRequest{Email: "test@example.com"}
@@ -108,7 +110,8 @@ func TestAuthService_RequestPasswordReset(t *testing.T) {
 func TestAuthService_RefreshToken(t *testing.T) {
 	mockRepo := new(MockUserRepository)
 	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
-	service := NewAuthService(mockRepo, jwtManager)
+	mockMailer := mailer.NewNoOpMailer()
+	service := NewAuthService(mockRepo, jwtManager, mockMailer)
 
 	ctx := context.Background()
 	user := &domain.User{

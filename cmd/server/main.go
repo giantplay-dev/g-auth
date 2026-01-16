@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -15,6 +16,7 @@ import (
 	"g-auth/internal/service"
 	"g-auth/pkg/jwt"
 	"g-auth/pkg/logger"
+	"g-auth/pkg/mailer"
 )
 
 func main() {
@@ -42,11 +44,22 @@ func main() {
 	// initialize JWT manager
 	jwtManager := jwt.NewJWTManager(cfg.JWTSecret, cfg.JWTExpiration, cfg.RefreshTokenExpiration)
 
+	// initialize mailer
+	smtpPort, _ := strconv.Atoi(cfg.SMTPPort)
+	var emailMailer mailer.Mailer
+	if cfg.SMTPHost != "" && cfg.SMTPUsername != "" && cfg.SMTPPassword != "" {
+		emailMailer = mailer.NewSMTPMailer(cfg.SMTPHost, smtpPort, cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPFrom)
+	} else {
+		// Use no-op mailer if SMTP is not configured
+		emailMailer = mailer.NewNoOpMailer()
+		appLogger.Warn("SMTP not configured, using no-op mailer")
+	}
+
 	// initialize repositories
 	userRepo := postgres.NewUserRepository(db)
 
 	// initialize services
-	authService := service.NewAuthService(userRepo, jwtManager)
+	authService := service.NewAuthService(userRepo, jwtManager, emailMailer)
 
 	// initialize HTTP handler
 	handler := handler.NewAuthHandler(authService)

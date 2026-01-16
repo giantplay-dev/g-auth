@@ -38,10 +38,10 @@ Create a `.env` file (or set system environment variables):
 
 ```bash
 # Application Environment
-ENV=production                    # Options: development, staging, production
+APP_ENV=production                    # Options: development, staging, production
 
 # Server Configuration
-PORT=8080                         # Port the service listens on
+APP_PORT=8080                         # Port the service listens on
 
 # Database Configuration
 DATABASE_URL=postgres://username:password@hostname:5432/dbname?sslmode=require
@@ -54,8 +54,8 @@ JWT_SECRET=your-super-secret-key-minimum-32-characters-long
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| ENV | Application environment | development | No |
-| PORT | HTTP server port | 8080 | No |
+| APP_ENV | Application environment | development | No |
+| APP_PORT | HTTP server port | 8080 | No |
 | DATABASE_URL | PostgreSQL connection string | - | Yes |
 | JWT_SECRET | Secret key for JWT signing | - | Yes |
 
@@ -184,7 +184,7 @@ docker build -t g-auth:latest .
 docker run -d \
   --name g-auth \
   -p 8080:8080 \
-  -e ENV=production \
+  -e APP_ENV=production \
   -e DATABASE_URL="postgres://user:pass@host:5432/db?sslmode=require" \
   -e JWT_SECRET="your-secret-key" \
   --restart unless-stopped \
@@ -224,8 +224,8 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      ENV: production
-      PORT: 8080
+      APP_ENV: production
+      APP_PORT: 8080
       DATABASE_URL: postgres://authuser:${DB_PASSWORD}@postgres:5432/authdb?sslmode=disable
       JWT_SECRET: ${JWT_SECRET}
     ports:
@@ -285,8 +285,8 @@ metadata:
   name: auth-config
   namespace: auth-system
 data:
-  ENV: "production"
-  PORT: "8080"
+  APP_ENV: "production"
+  APP_PORT: "8080"
 ```
 
 **3. Secret** (`k8s/secret.yaml`):
@@ -482,11 +482,11 @@ aws rds create-db-instance \
       ],
       "environment": [
         {
-          "name": "ENV",
+          "name": "APP_ENV",
           "value": "production"
         },
         {
-          "name": "PORT",
+          "name": "APP_PORT",
           "value": "8080"
         }
       ],
@@ -525,7 +525,7 @@ gcloud run deploy g-auth \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
-  --set-env-vars ENV=production,PORT=8080 \
+  --set-env-vars APP_ENV=production,APP_PORT=8080 \
   --set-secrets=DATABASE_URL=auth-database-url:latest,JWT_SECRET=auth-jwt-secret:latest \
   --min-instances 1 \
   --max-instances 10 \
@@ -541,7 +541,7 @@ gcloud run deploy g-auth \
 
 - [ ] Set strong JWT_SECRET (minimum 32 characters)
 - [ ] Configure DATABASE_URL with SSL enabled
-- [ ] Set ENV=production
+- [ ] Set APP_ENV=production
 - [ ] Review and set appropriate resource limits
 - [ ] Set up database backups
 - [ ] Configure logging to external service

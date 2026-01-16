@@ -15,6 +15,11 @@ type Config struct {
 	JWTSecret              string
 	JWTExpiration          time.Duration
 	RefreshTokenExpiration time.Duration
+	SMTPHost               string
+	SMTPPort               string
+	SMTPUsername           string
+	SMTPPassword           string
+	SMTPFrom               string
 }
 
 func Load() *Config {
@@ -23,12 +28,17 @@ func Load() *Config {
 	}
 
 	return &Config{
-		Env:                    getEnv("ENV", "development"),
-		Port:                   getEnv("PORT", "8080"),
+		Env:                    getEnv("APP_ENV", "development"),
+		Port:                   getEnv("APP_PORT", "8080"),
 		DatabaseURL:            getEnv("DATABASE_URL", "postgres://user:pass@localhost:5432/dbname"),
 		JWTSecret:              getEnv("JWT_SECRET", "supersecretkey"),
 		JWTExpiration:          15 * time.Minute,   // Access token: 15 minutes
 		RefreshTokenExpiration: 7 * 24 * time.Hour, // Refresh token: 7 days
+		SMTPHost:               getEnv("SMTP_HOST", "smtp.gmail.com"),
+		SMTPPort:               getEnv("SMTP_PORT", "587"),
+		SMTPUsername:           getEnv("SMTP_USERNAME", ""),
+		SMTPPassword:           getEnv("SMTP_PASSWORD", ""),
+		SMTPFrom:               getEnv("SMTP_FROM", ""),
 	}
 }
 

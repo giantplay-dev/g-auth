@@ -91,8 +91,8 @@ cd g-auth
 Create a `.env` file in the root directory:
 
 ```env
-ENV=development
-PORT=8080
+APP_ENV=development
+APP_PORT=8080
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/authdb?sslmode=disable
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 ```
