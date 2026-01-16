@@ -18,6 +18,10 @@ help:
 	@echo "  migrate-002-down    - Run migration 002 down"
 	@echo "  migrate-003-up      - Run migration 003 up"
 	@echo "  migrate-003-down    - Run migration 003 down"
+	@echo "  migrate-004-up      - Run migration 004 up"
+	@echo "  migrate-004-down    - Run migration 004 down"
+	@echo "  migrate-005-up      - Run migration 005 up"
+	@echo "  migrate-005-down    - Run migration 005 down"
 	@echo "  docker-up           - Start PostgreSQL in Docker"
 	@echo "  docker-down         - Stop and remove PostgreSQL Docker container"
 	@echo "  docker-migrate      - Run migrations in Docker container"
@@ -60,10 +64,16 @@ migrate-004-up:
 migrate-004-down:
 	psql $(DATABASE_URL) -f migrations/004_add_email_verification_fields.down.sql
 
-migrate-all-up: migrate-001-up migrate-002-up migrate-003-up migrate-004-up
+migrate-005-up:
+	psql $(DATABASE_URL) -f migrations/005_add_account_lockout_fields.up.sql
+
+migrate-005-down:
+	psql $(DATABASE_URL) -f migrations/005_add_account_lockout_fields.down.sql
+
+migrate-all-up: migrate-001-up migrate-002-up migrate-003-up migrate-004-up migrate-005-up
 	@echo "All migrations applied successfully"
 
-migrate-all-down: migrate-004-down migrate-003-down migrate-002-down migrate-001-down
+migrate-all-down: migrate-005-down migrate-004-down migrate-003-down migrate-002-down migrate-001-down
 	@echo "All migrations rolled back successfully"
 
 # Legacy aliases for backward compatibility
@@ -94,6 +104,7 @@ docker-migrate: docker-up
 	docker exec -i auth-postgres psql -U postgres -d g-auth -f /dev/stdin < migrations/002_add_password_reset_fields.up.sql
 	docker exec -i auth-postgres psql -U postgres -d g-auth -f /dev/stdin < migrations/003_add_refresh_token_fields.up.sql
 	docker exec -i auth-postgres psql -U postgres -d g-auth -f /dev/stdin < migrations/004_add_email_verification_fields.up.sql
+	docker exec -i auth-postgres psql -U postgres -d g-auth -f /dev/stdin < migrations/005_add_account_lockout_fields.up.sql
 	@echo "Migrations completed successfully"
 
 # Build and run service in Docker

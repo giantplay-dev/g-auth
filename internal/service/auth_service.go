@@ -94,9 +94,51 @@ func (s *AuthService) Login(ctx context.Context, req *domain.LoginRequest) (*dom
 		return nil, err
 	}
 
+	// check if account is locked
+	if user.IsLocked {
+		if user.LockedUntil != nil && user.LockedUntil.After(time.Now()) {
+			return nil, domain.ErrAccountLockedWithTime{UnlockTime: *user.LockedUntil}
+		} else {
+			// unlock account if lock period has expired
+			err = s.userRepo.UnlockAccount(ctx, user.ID)
+			if err != nil {
+				return nil, err
+			}
+			user.IsLocked = false
+			user.FailedAttempts = 0
+		}
+	}
+
 	// verify password
 	if !password.Verify(req.Password, user.Password) {
-		return nil, domain.ErrInvalidCredentials
+		// increment failed attempts
+		err = s.userRepo.IncrementFailedAttempts(ctx, user.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		// calculate remaining attempts (5 total allowed - current failed attempts)
+		remainingAttempts := 5 - (user.FailedAttempts + 1)
+
+		// check if account should be locked (after 5 failed attempts)
+		if user.FailedAttempts >= 4 { // 4 because it will be incremented to 5
+			lockedUntil := time.Now().Add(15 * time.Minute) // lock for 15 minutes
+			err = s.userRepo.LockAccount(ctx, user.ID, lockedUntil)
+			if err != nil {
+				return nil, err
+			}
+			return nil, domain.ErrAccountLockedWithTime{UnlockTime: lockedUntil}
+		}
+
+		return nil, domain.ErrInvalidCredentialsWithAttempts{RemainingAttempts: remainingAttempts}
+	}
+
+	// reset failed attempts on successful login
+	if user.FailedAttempts > 0 {
+		err = s.userRepo.ResetFailedAttempts(ctx, user.ID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// check if email is verified

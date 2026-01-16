@@ -99,6 +99,26 @@ func (m *MockUserRepository) VerifyEmail(ctx context.Context, userID uuid.UUID) 
 	return args.Error(0)
 }
 
+func (m *MockUserRepository) IncrementFailedAttempts(ctx context.Context, userID uuid.UUID) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) ResetFailedAttempts(ctx context.Context, userID uuid.UUID) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) LockAccount(ctx context.Context, userID uuid.UUID, lockedUntil time.Time) error {
+	args := m.Called(ctx, userID, lockedUntil)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) UnlockAccount(ctx context.Context, userID uuid.UUID) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
 func TestAuthService_RequestPasswordReset(t *testing.T) {
 	mockRepo := new(MockUserRepository)
 	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
@@ -156,5 +176,119 @@ func TestAuthService_RefreshToken(t *testing.T) {
 	assert.NotEmpty(t, resp.RefreshToken)
 	assert.Equal(t, user.ID, resp.User.ID)
 	assert.Equal(t, user.Email, resp.User.Email)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_AccountLockout(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	mockMailer := mailer.NewNoOpMailer()
+	service := NewAuthService(mockRepo, jwtManager, mockMailer)
+
+	ctx := context.Background()
+	userID := uuid.New()
+	user := &domain.User{
+		ID:             userID,
+		Email:          "test@example.com",
+		Password:       "$2a$10$hashedpassword", // mock hashed password
+		Name:           "Test User",
+		EmailVerified:  true,
+		FailedAttempts: 4, // 4 failed attempts, next one will lock
+		IsLocked:       false,
+	}
+
+	req := &domain.LoginRequest{
+		Email:    "test@example.com",
+		Password: "wrongpassword",
+	}
+
+	// Mock GetByEmail to return user with 4 failed attempts
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+
+	// Mock IncrementFailedAttempts
+	mockRepo.On("IncrementFailedAttempts", ctx, userID).Return(nil)
+
+	// Mock LockAccount (should be called after 5th failed attempt)
+	mockRepo.On("LockAccount", ctx, userID, mock.AnythingOfType("time.Time")).Return(nil)
+
+	// Test login with wrong password - should lock account
+	_, err := service.Login(ctx, req)
+
+	assert.Error(t, err)
+	assert.IsType(t, domain.ErrAccountLockedWithTime{}, err)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_LoginLockedAccount(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	mockMailer := mailer.NewNoOpMailer()
+	service := NewAuthService(mockRepo, jwtManager, mockMailer)
+
+	ctx := context.Background()
+	userID := uuid.New()
+	lockedUntil := time.Now().Add(15 * time.Minute)
+	user := &domain.User{
+		ID:          userID,
+		Email:       "test@example.com",
+		Password:    "$2a$10$hashedpassword",
+		Name:        "Test User",
+		IsLocked:    true,
+		LockedUntil: &lockedUntil,
+	}
+
+	req := &domain.LoginRequest{
+		Email:    "test@example.com",
+		Password: "correctpassword",
+	}
+
+	// Mock GetByEmail to return locked user
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+
+	// Test login with locked account
+	_, err := service.Login(ctx, req)
+
+	assert.Error(t, err)
+	expectedErr := domain.ErrAccountLockedWithTime{UnlockTime: lockedUntil}
+	assert.Equal(t, expectedErr, err)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_LoginInvalidCredentialsWithAttempts(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	mockMailer := mailer.NewNoOpMailer()
+	service := NewAuthService(mockRepo, jwtManager, mockMailer)
+
+	ctx := context.Background()
+	userID := uuid.New()
+	user := &domain.User{
+		ID:             userID,
+		Email:          "test@example.com",
+		Password:       "$2a$10$hashedpassword", // mock hashed password
+		Name:           "Test User",
+		EmailVerified:  true,
+		FailedAttempts: 1, // 1 failed attempt so far
+		IsLocked:       false,
+	}
+
+	req := &domain.LoginRequest{
+		Email:    "test@example.com",
+		Password: "wrongpassword",
+	}
+
+	// Mock GetByEmail to return user
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+
+	// Mock IncrementFailedAttempts
+	mockRepo.On("IncrementFailedAttempts", ctx, userID).Return(nil)
+
+	// Test login with wrong password - should return error with remaining attempts
+	_, err := service.Login(ctx, req)
+
+	assert.Error(t, err)
+	expectedErr := domain.ErrInvalidCredentialsWithAttempts{RemainingAttempts: 3} // 5 - (1 + 1) = 3
+	assert.Equal(t, expectedErr, err)
+	assert.Contains(t, err.Error(), "3 attempts remaining")
 	mockRepo.AssertExpectations(t)
 }

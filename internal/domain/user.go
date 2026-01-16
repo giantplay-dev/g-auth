@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,13 +11,34 @@ import (
 var (
 	ErrUserNotFound             = errors.New("user not found")
 	ErrUserAlreadyExists        = errors.New("user already exists")
-	ErrInvalidCredentials       = errors.New("invalid credentials")
+	ErrInvalidCredentials       = errors.New("Invalid email or password")
 	ErrInvalidResetToken        = errors.New("invalid or expired reset token")
 	ErrInvalidVerificationToken = errors.New("invalid or expired verification token")
 	ErrResetTokenExpired        = errors.New("reset token has expired")
 	ErrVerificationTokenExpired = errors.New("verification token has expired")
-	ErrEmailNotVerified         = errors.New("email not verified")
+	ErrEmailNotVerified         = errors.New("Please verify your email address before logging in")
 )
+
+// ErrAccountLockedWithTime represents an account locked error with unlock time information
+type ErrAccountLockedWithTime struct {
+	UnlockTime time.Time
+}
+
+func (e ErrAccountLockedWithTime) Error() string {
+	return fmt.Sprintf("Account temporarily locked due to too many failed login attempts. You can try again after %s.", e.UnlockTime.Format("15:04:05"))
+}
+
+// ErrInvalidCredentialsWithAttempts represents an invalid credentials error with attempt information
+type ErrInvalidCredentialsWithAttempts struct {
+	RemainingAttempts int
+}
+
+func (e ErrInvalidCredentialsWithAttempts) Error() string {
+	if e.RemainingAttempts == 1 {
+		return "Invalid email or password. 1 attempt remaining before account lockout."
+	}
+	return fmt.Sprintf("Invalid email or password. %d attempts remaining before account lockout.", e.RemainingAttempts)
+}
 
 type User struct {
 	ID                         uuid.UUID  `json:"id"`
@@ -30,6 +52,9 @@ type User struct {
 	ResetTokenExpiresAt        *time.Time `json:"-"`
 	RefreshToken               *string    `json:"-"`
 	RefreshTokenExpiresAt      *time.Time `json:"-"`
+	FailedAttempts             int        `json:"-"`
+	LockedUntil                *time.Time `json:"-"`
+	IsLocked                   bool       `json:"-"`
 	CreatedAt                  time.Time  `json:"created_at"`
 	UpdatedAt                  time.Time  `json:"updated_at"`
 }

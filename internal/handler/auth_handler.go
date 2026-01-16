@@ -79,10 +79,20 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			respondWithError(w, http.StatusUnauthorized, err.Error())
 			return
 		}
+		if _, ok := err.(domain.ErrInvalidCredentialsWithAttempts); ok {
+			respondWithError(w, http.StatusUnauthorized, err.Error())
+			return
+		}
 		if err == domain.ErrEmailNotVerified {
 			respondWithError(w, http.StatusForbidden, err.Error())
 			return
 		}
+		if _, ok := err.(domain.ErrAccountLockedWithTime); ok {
+			respondWithError(w, http.StatusTooManyRequests, err.Error())
+			return
+		}
+		// log error
+		log.Printf("Failed to login: %v", err)
 		respondWithError(w, http.StatusInternalServerError, "Failed to login")
 		return
 	}

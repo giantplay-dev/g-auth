@@ -82,8 +82,9 @@ All error responses follow this format:
 |------|---------|
 | 200  | OK - Request succeeded |
 | 400  | Bad Request - Invalid request format |
-| 401  | Unauthorized - Missing or invalid authentication |
+| 401  | Unauthorized - Invalid email or password |
 | 403  | Forbidden - Email not verified |
+| 429  | Too Many Requests - Account temporarily locked |
 | 500  | Internal Server Error - Server error |
 
 **400 Bad Request** - Invalid request format:
@@ -96,14 +97,28 @@ All error responses follow this format:
 **401 Unauthorized** - Invalid credentials:
 ```json
 {
-  "error": "invalid credentials"
+  "error": "Invalid email or password. 4 attempts remaining before account lockout."
+}
+```
+
+**401 Unauthorized** - Invalid credentials (near lockout):
+```json
+{
+  "error": "Invalid email or password. 1 attempt remaining before account lockout."
 }
 ```
 
 **403 Forbidden** - Email not verified:
 ```json
 {
-  "error": "email not verified"
+  "error": "Please verify your email address before logging in"
+}
+```
+
+**429 Too Many Requests** - Account locked due to failed attempts:
+```json
+{
+  "error": "Account temporarily locked due to too many failed login attempts. You can try again after 15:30:45"
 }
 ```
 

@@ -248,6 +248,23 @@ The project follows **Clean Architecture** principles:
 - **Interface Segregation**: Small, focused interfaces
 - **Single Responsibility**: Each component has one reason to change
 
+## 🔒 Security Features
+
+### Account Lockout
+- **Failed Attempt Tracking**: Tracks consecutive failed login attempts per user
+- **Automatic Lockout**: Accounts are locked after 5 consecutive failed attempts
+- **Lockout Duration**: Accounts remain locked for 15 minutes
+- **Automatic Unlock**: Accounts are automatically unlocked after the lockout period expires
+- **Reset on Success**: Failed attempt counter resets to 0 on successful login
+- **User-Friendly Messages**: Clear error messages inform users of lockout status, remaining attempts, and unlock times
+
+### Other Security Measures
+- **Password Security**: bcrypt password hashing with proper salt rounds
+- **Rate Limiting**: API rate limiting per IP address to prevent abuse
+- **JWT Authentication**: Secure token-based authentication
+- **Email Verification**: Required email verification before login
+- **SQL Injection Prevention**: All queries use parameterized statements
+
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -270,8 +287,8 @@ For issues and questions, please open an issue in the repository.
 - [x] Implement refresh token mechanism
 - [x] Add email verification
 - [x] Add API rate limiting
+- [x] Implement account lockout after failed attempts
 - [ ] Implement role-based access control (RBAC)
-- [ ] Implement account lockout after failed attempts
 - [ ] Add comprehensive API documentation with Swagger
 - [ ] Implement graceful shutdown
 - [ ] Add health check with database status

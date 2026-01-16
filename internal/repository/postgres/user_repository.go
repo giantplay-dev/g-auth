@@ -50,14 +50,14 @@ func (r *userRepository) Create(ctx context.Context, user *domain.User) error {
 
 func (r *userRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
 	query := `
-        SELECT id, email, password, name, email_verified, verification_token, verification_token_expires_at, reset_token, reset_token_expires_at, refresh_token, refresh_token_expires_at, created_at, updated_at
+        SELECT id, email, password, name, email_verified, verification_token, verification_token_expires_at, reset_token, reset_token_expires_at, refresh_token, refresh_token_expires_at, failed_attempts, locked_until, is_locked, created_at, updated_at
         FROM users
         WHERE email = $1
     `
 
 	user := &domain.User{}
 	var idStr string
-	var verificationToken, verificationTokenExpiresAt, resetToken, resetTokenExpiresAt, refreshToken, refreshTokenExpiresAt sql.NullString
+	var verificationToken, verificationTokenExpiresAt, resetToken, resetTokenExpiresAt, refreshToken, refreshTokenExpiresAt, lockedUntil sql.NullString
 	err := r.db.QueryRowContext(ctx, query, email).Scan(
 		&idStr,
 		&user.Email,
@@ -70,6 +70,9 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*domain.
 		&resetTokenExpiresAt,
 		&refreshToken,
 		&refreshTokenExpiresAt,
+		&user.FailedAttempts,
+		&lockedUntil,
+		&user.IsLocked,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -117,20 +120,25 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*domain.
 			user.RefreshTokenExpiresAt = &expiresAt
 		}
 	}
+	if lockedUntil.Valid {
+		if lockedAt, parseErr := time.Parse(time.RFC3339, lockedUntil.String); parseErr == nil {
+			user.LockedUntil = &lockedAt
+		}
+	}
 
 	return user, nil
 }
 
 func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	query := `
-        SELECT id, email, password, name, email_verified, verification_token, verification_token_expires_at, reset_token, reset_token_expires_at, refresh_token, refresh_token_expires_at, created_at, updated_at
+        SELECT id, email, password, name, email_verified, verification_token, verification_token_expires_at, reset_token, reset_token_expires_at, refresh_token, refresh_token_expires_at, failed_attempts, locked_until, is_locked, created_at, updated_at
         FROM users
         WHERE id = $1
     `
 
 	user := &domain.User{}
 	var idStr string
-	var verificationToken, verificationTokenExpiresAt, resetToken, resetTokenExpiresAt, refreshToken, refreshTokenExpiresAt sql.NullString
+	var verificationToken, verificationTokenExpiresAt, resetToken, resetTokenExpiresAt, refreshToken, refreshTokenExpiresAt, lockedUntil sql.NullString
 	err := r.db.QueryRowContext(ctx, query, id.String()).Scan(
 		&idStr,
 		&user.Email,
@@ -143,6 +151,9 @@ func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Use
 		&resetTokenExpiresAt,
 		&refreshToken,
 		&refreshTokenExpiresAt,
+		&user.FailedAttempts,
+		&lockedUntil,
+		&user.IsLocked,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -181,6 +192,11 @@ func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Use
 	if refreshTokenExpiresAt.Valid {
 		if expiresAt, parseErr := time.Parse(time.RFC3339, refreshTokenExpiresAt.String); parseErr == nil {
 			user.RefreshTokenExpiresAt = &expiresAt
+		}
+	}
+	if lockedUntil.Valid {
+		if lockedAt, parseErr := time.Parse(time.RFC3339, lockedUntil.String); parseErr == nil {
+			user.LockedUntil = &lockedAt
 		}
 	}
 
@@ -418,6 +434,50 @@ func (r *userRepository) VerifyEmail(ctx context.Context, userID uuid.UUID) erro
 	query := `
         UPDATE users
         SET email_verified = TRUE, verification_token = NULL, verification_token_expires_at = NULL, updated_at = NOW()
+        WHERE id = $1
+    `
+
+	_, err := r.db.ExecContext(ctx, query, userID.String())
+	return err
+}
+
+func (r *userRepository) IncrementFailedAttempts(ctx context.Context, userID uuid.UUID) error {
+	query := `
+        UPDATE users
+        SET failed_attempts = failed_attempts + 1, updated_at = NOW()
+        WHERE id = $1
+    `
+
+	_, err := r.db.ExecContext(ctx, query, userID.String())
+	return err
+}
+
+func (r *userRepository) ResetFailedAttempts(ctx context.Context, userID uuid.UUID) error {
+	query := `
+        UPDATE users
+        SET failed_attempts = 0, is_locked = FALSE, locked_until = NULL, updated_at = NOW()
+        WHERE id = $1
+    `
+
+	_, err := r.db.ExecContext(ctx, query, userID.String())
+	return err
+}
+
+func (r *userRepository) LockAccount(ctx context.Context, userID uuid.UUID, lockedUntil time.Time) error {
+	query := `
+        UPDATE users
+        SET is_locked = TRUE, locked_until = $2, updated_at = NOW()
+        WHERE id = $1
+    `
+
+	_, err := r.db.ExecContext(ctx, query, userID.String(), lockedUntil)
+	return err
+}
+
+func (r *userRepository) UnlockAccount(ctx context.Context, userID uuid.UUID) error {
+	query := `
+        UPDATE users
+        SET is_locked = FALSE, locked_until = NULL, failed_attempts = 0, updated_at = NOW()
         WHERE id = $1
     `
 

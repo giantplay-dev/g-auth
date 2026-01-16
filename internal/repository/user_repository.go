@@ -23,4 +23,8 @@ type UserRepository interface {
 	UpdateVerificationToken(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) error
 	GetByVerificationToken(ctx context.Context, token string) (*domain.User, error)
 	VerifyEmail(ctx context.Context, userID uuid.UUID) error
+	IncrementFailedAttempts(ctx context.Context, userID uuid.UUID) error
+	ResetFailedAttempts(ctx context.Context, userID uuid.UUID) error
+	LockAccount(ctx context.Context, userID uuid.UUID, lockedUntil time.Time) error
+	UnlockAccount(ctx context.Context, userID uuid.UUID) error
 }
