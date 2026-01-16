@@ -32,11 +32,15 @@ func (h *AuthHandler) SetupRoutes() *mux.Router {
 	r.HandleFunc("/api/auth/password-reset/confirm", h.ResetPassword).Methods("POST")
 	r.HandleFunc("/api/auth/verify-email", h.VerifyEmail).Methods("POST")
 	r.HandleFunc("/api/auth/resend-verification", h.ResendVerification).Methods("POST")
+	r.HandleFunc("/api/auth/mfa/verify", h.VerifyMFACode).Methods("POST")
 
 	// protected routes
 	protected := r.PathPrefix("/api").Subrouter()
 	protected.Use(middleware.AuthMiddleware)
 	protected.HandleFunc("/me", h.GetMe).Methods("GET")
+	protected.HandleFunc("/mfa/enable", h.EnableMFA).Methods("POST")
+	protected.HandleFunc("/mfa/disable", h.DisableMFA).Methods("POST")
+	protected.HandleFunc("/mfa/status", h.GetMFAStatus).Methods("GET")
 
 	// health check
 	r.HandleFunc("/health", h.Health).Methods("GET")
@@ -85,6 +89,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		}
 		if err == domain.ErrEmailNotVerified {
 			respondWithError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		if err == domain.ErrMFARequired {
+			respondWithJSON(w, http.StatusAccepted, map[string]string{
+				"message":      "MFA code has been sent to your email",
+				"mfa_required": "true",
+			})
 			return
 		}
 		if _, ok := err.(domain.ErrAccountLockedWithTime); ok {
@@ -206,6 +217,110 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		respondWithError(w, http.StatusInternalServerError, "Failed to resend verification")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, resp)
+}
+
+func (h *AuthHandler) VerifyMFACode(w http.ResponseWriter, r *http.Request) {
+	var req domain.MFAVerifyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	resp, err := h.authService.VerifyMFACode(r.Context(), &req)
+	if err != nil {
+		if err == domain.ErrInvalidMFACode {
+			respondWithError(w, http.StatusUnauthorized, err.Error())
+			return
+		}
+		if err == domain.ErrMFACodeExpired {
+			respondWithError(w, http.StatusUnauthorized, err.Error())
+			return
+		}
+		if err == domain.ErrMFANotEnabled {
+			respondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if err == domain.ErrInvalidCredentials {
+			respondWithError(w, http.StatusUnauthorized, err.Error())
+			return
+		}
+		log.Printf("Failed to verify MFA code: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to verify MFA code")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, resp)
+}
+
+func (h *AuthHandler) EnableMFA(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+
+	var req domain.MFAEnableRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	resp, err := h.authService.EnableMFA(r.Context(), userID, &req)
+	if err != nil {
+		if err == domain.ErrInvalidCredentials {
+			respondWithError(w, http.StatusUnauthorized, err.Error())
+			return
+		}
+		if err == domain.ErrMFAAlreadyEnabled {
+			respondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		log.Printf("Failed to enable MFA: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to enable MFA")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, resp)
+}
+
+func (h *AuthHandler) DisableMFA(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+
+	var req domain.MFADisableRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	resp, err := h.authService.DisableMFA(r.Context(), userID, &req)
+	if err != nil {
+		if err == domain.ErrInvalidCredentials {
+			respondWithError(w, http.StatusUnauthorized, err.Error())
+			return
+		}
+		if err == domain.ErrMFANotEnabled {
+			respondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		log.Printf("Failed to disable MFA: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to disable MFA")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, resp)
+}
+
+func (h *AuthHandler) GetMFAStatus(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+
+	resp, err := h.authService.GetMFAStatus(r.Context(), userID)
+	if err != nil {
+		if err == domain.ErrUserNotFound {
+			respondWithError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		log.Printf("Failed to get MFA status: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to get MFA status")
 		return
 	}
 

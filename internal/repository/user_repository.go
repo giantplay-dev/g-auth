@@ -27,4 +27,8 @@ type UserRepository interface {
 	ResetFailedAttempts(ctx context.Context, userID uuid.UUID) error
 	LockAccount(ctx context.Context, userID uuid.UUID, lockedUntil time.Time) error
 	UnlockAccount(ctx context.Context, userID uuid.UUID) error
+	UpdateMFACode(ctx context.Context, userID uuid.UUID, code string, expiresAt time.Time) error
+	ClearMFACode(ctx context.Context, userID uuid.UUID) error
+	EnableMFA(ctx context.Context, userID uuid.UUID) error
+	DisableMFA(ctx context.Context, userID uuid.UUID) error
 }

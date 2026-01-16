@@ -121,6 +121,26 @@ func (m *MockUserRepository) UnlockAccount(ctx context.Context, userID uuid.UUID
 	return args.Error(0)
 }
 
+func (m *MockUserRepository) UpdateMFACode(ctx context.Context, userID uuid.UUID, code string, expiresAt time.Time) error {
+	args := m.Called(ctx, userID, code, expiresAt)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) ClearMFACode(ctx context.Context, userID uuid.UUID) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) EnableMFA(ctx context.Context, userID uuid.UUID) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) DisableMFA(ctx context.Context, userID uuid.UUID) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
 // MockMailer is a mock implementation of Mailer that can track calls and fail on demand
 type MockMailer struct {
 	mock.Mock
@@ -128,6 +148,11 @@ type MockMailer struct {
 
 func (m *MockMailer) SendEmail(to, subject, body string) error {
 	args := m.Called(to, subject, body)
+	return args.Error(0)
+}
+
+func (m *MockMailer) SendMFACode(to, name, code string) error {
+	args := m.Called(to, name, code)
 	return args.Error(0)
 }
 
@@ -1336,5 +1361,244 @@ func TestAuthService_LoginInvalidCredentialsWithAttempts(t *testing.T) {
 	expectedErr := domain.ErrInvalidCredentialsWithAttempts{RemainingAttempts: 3} // 5 - (1 + 1) = 3
 	assert.Equal(t, expectedErr, err)
 	assert.Contains(t, err.Error(), "3 attempts remaining")
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_VerifyMFACode_Success(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	mockMailer := mailer.NewNoOpMailer()
+	service := NewAuthService(mockRepo, jwtManager, mockMailer)
+
+	ctx := context.Background()
+	userID := uuid.New()
+	mfaCode := "123456"
+	expiresAt := time.Now().Add(10 * time.Minute)
+
+	user := &domain.User{
+		ID:               userID,
+		Email:            "test@example.com",
+		Name:             "Test User",
+		MFAEnabled:       true,
+		MFACode:          &mfaCode,
+		MFACodeExpiresAt: &expiresAt,
+	}
+
+	req := &domain.MFAVerifyRequest{
+		Email: "test@example.com",
+		Code:  "123456",
+	}
+
+	// Mock repository calls
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+	mockRepo.On("ClearMFACode", ctx, userID).Return(nil)
+	mockRepo.On("UpdateRefreshToken", ctx, userID, mock.AnythingOfType("string"), mock.AnythingOfType("time.Time")).Return(nil)
+
+	// Test successful MFA verification
+	resp, err := service.VerifyMFACode(ctx, req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.NotEmpty(t, resp.Token)
+	assert.NotEmpty(t, resp.RefreshToken)
+	assert.Equal(t, user.ID, resp.User.ID)
+	assert.Equal(t, user.Email, resp.User.Email)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_VerifyMFACode_UserNotFound(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	mockMailer := mailer.NewNoOpMailer()
+	service := NewAuthService(mockRepo, jwtManager, mockMailer)
+
+	ctx := context.Background()
+	req := &domain.MFAVerifyRequest{
+		Email: "test@example.com",
+		Code:  "123456",
+	}
+
+	// Mock GetByEmail to return user not found
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrUserNotFound)
+
+	// Test MFA verification with non-existent user
+	resp, err := service.VerifyMFACode(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Equal(t, domain.ErrInvalidCredentials, err)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_VerifyMFACode_MFANotEnabled(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	mockMailer := mailer.NewNoOpMailer()
+	service := NewAuthService(mockRepo, jwtManager, mockMailer)
+
+	ctx := context.Background()
+	user := &domain.User{
+		ID:         uuid.New(),
+		Email:      "test@example.com",
+		Name:       "Test User",
+		MFAEnabled: false,
+	}
+
+	req := &domain.MFAVerifyRequest{
+		Email: "test@example.com",
+		Code:  "123456",
+	}
+
+	// Mock GetByEmail to return user without MFA enabled
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+
+	// Test MFA verification when MFA is not enabled
+	resp, err := service.VerifyMFACode(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Equal(t, domain.ErrMFANotEnabled, err)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_VerifyMFACode_NilMFACode(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	mockMailer := mailer.NewNoOpMailer()
+	service := NewAuthService(mockRepo, jwtManager, mockMailer)
+
+	ctx := context.Background()
+	user := &domain.User{
+		ID:         uuid.New(),
+		Email:      "test@example.com",
+		Name:       "Test User",
+		MFAEnabled: true,
+		MFACode:    nil, // MFA code is nil (already used or cleared)
+	}
+
+	req := &domain.MFAVerifyRequest{
+		Email: "test@example.com",
+		Code:  "123456",
+	}
+
+	// Mock GetByEmail to return user with nil MFA code
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+
+	// Test MFA verification when MFA code is nil (e.g., already used)
+	resp, err := service.VerifyMFACode(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Equal(t, domain.ErrInvalidMFACode, err)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_VerifyMFACode_InvalidCode(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	mockMailer := mailer.NewNoOpMailer()
+	service := NewAuthService(mockRepo, jwtManager, mockMailer)
+
+	ctx := context.Background()
+	mfaCode := "123456"
+	expiresAt := time.Now().Add(10 * time.Minute)
+
+	user := &domain.User{
+		ID:               uuid.New(),
+		Email:            "test@example.com",
+		Name:             "Test User",
+		MFAEnabled:       true,
+		MFACode:          &mfaCode,
+		MFACodeExpiresAt: &expiresAt,
+	}
+
+	req := &domain.MFAVerifyRequest{
+		Email: "test@example.com",
+		Code:  "654321", // wrong code
+	}
+
+	// Mock GetByEmail to return user
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+
+	// Test MFA verification with invalid code
+	resp, err := service.VerifyMFACode(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Equal(t, domain.ErrInvalidMFACode, err)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_VerifyMFACode_ExpiredCode(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	mockMailer := mailer.NewNoOpMailer()
+	service := NewAuthService(mockRepo, jwtManager, mockMailer)
+
+	ctx := context.Background()
+	mfaCode := "123456"
+	expiresAt := time.Now().Add(-10 * time.Minute) // expired
+
+	user := &domain.User{
+		ID:               uuid.New(),
+		Email:            "test@example.com",
+		Name:             "Test User",
+		MFAEnabled:       true,
+		MFACode:          &mfaCode,
+		MFACodeExpiresAt: &expiresAt,
+	}
+
+	req := &domain.MFAVerifyRequest{
+		Email: "test@example.com",
+		Code:  "123456",
+	}
+
+	// Mock GetByEmail to return user
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+
+	// Test MFA verification with expired code
+	resp, err := service.VerifyMFACode(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Equal(t, domain.ErrMFACodeExpired, err)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_VerifyMFACode_ClearMFACodeError(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	mockMailer := mailer.NewNoOpMailer()
+	service := NewAuthService(mockRepo, jwtManager, mockMailer)
+
+	ctx := context.Background()
+	userID := uuid.New()
+	mfaCode := "123456"
+	expiresAt := time.Now().Add(10 * time.Minute)
+
+	user := &domain.User{
+		ID:               userID,
+		Email:            "test@example.com",
+		Name:             "Test User",
+		MFAEnabled:       true,
+		MFACode:          &mfaCode,
+		MFACodeExpiresAt: &expiresAt,
+	}
+
+	req := &domain.MFAVerifyRequest{
+		Email: "test@example.com",
+		Code:  "123456",
+	}
+
+	// Mock repository calls
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+	mockRepo.On("ClearMFACode", ctx, userID).Return(errors.New("database error"))
+
+	// Test MFA verification when clearing MFA code fails
+	resp, err := service.VerifyMFACode(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "database error")
 	mockRepo.AssertExpectations(t)
 }

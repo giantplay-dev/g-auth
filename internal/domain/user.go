@@ -17,6 +17,11 @@ var (
 	ErrResetTokenExpired        = errors.New("reset token has expired")
 	ErrVerificationTokenExpired = errors.New("verification token has expired")
 	ErrEmailNotVerified         = errors.New("Please verify your email address before logging in")
+	ErrInvalidMFACode           = errors.New("invalid or expired MFA code")
+	ErrMFACodeExpired           = errors.New("MFA code has expired")
+	ErrMFARequired              = errors.New("MFA verification required")
+	ErrMFAAlreadyEnabled        = errors.New("MFA is already enabled")
+	ErrMFANotEnabled            = errors.New("MFA is not enabled")
 )
 
 // ErrAccountLockedWithTime represents an account locked error with unlock time information
@@ -55,6 +60,9 @@ type User struct {
 	FailedAttempts             int        `json:"-"`
 	LockedUntil                *time.Time `json:"-"`
 	IsLocked                   bool       `json:"-"`
+	MFAEnabled                 bool       `json:"mfa_enabled"`
+	MFACode                    *string    `json:"-"`
+	MFACodeExpiresAt           *time.Time `json:"-"`
 	CreatedAt                  time.Time  `json:"created_at"`
 	UpdatedAt                  time.Time  `json:"updated_at"`
 }
@@ -111,4 +119,35 @@ type ResendVerificationRequest struct {
 
 type ResendVerificationResponse struct {
 	Message string `json:"message"`
+}
+
+type MFAVerifyRequest struct {
+	Email string `json:"email"`
+	Code  string `json:"code"`
+}
+
+type MFAVerifyResponse struct {
+	Token        string `json:"token"`
+	RefreshToken string `json:"refresh_token"`
+	User         User   `json:"user"`
+}
+
+type MFAEnableRequest struct {
+	Password string `json:"password"`
+}
+
+type MFAEnableResponse struct {
+	Message string `json:"message"`
+}
+
+type MFADisableRequest struct {
+	Password string `json:"password"`
+}
+
+type MFADisableResponse struct {
+	Message string `json:"message"`
+}
+
+type MFAStatusResponse struct {
+	MFAEnabled bool `json:"mfa_enabled"`
 }

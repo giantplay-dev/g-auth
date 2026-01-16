@@ -13,6 +13,7 @@ import (
 	"g-auth/internal/repository"
 	"g-auth/pkg/jwt"
 	"g-auth/pkg/mailer"
+	"g-auth/pkg/mfa"
 	"g-auth/pkg/password"
 )
 
@@ -144,6 +145,30 @@ func (s *AuthService) Login(ctx context.Context, req *domain.LoginRequest) (*dom
 	// check if email is verified
 	if !user.EmailVerified {
 		return nil, domain.ErrEmailNotVerified
+	}
+
+	// check if MFA is enabled
+	if user.MFAEnabled {
+		// generate and send MFA code
+		code, err := mfa.GenerateCode()
+		if err != nil {
+			return nil, err
+		}
+
+		expiresAt := mfa.GetExpirationTime()
+		err = s.userRepo.UpdateMFACode(ctx, user.ID, code, expiresAt)
+		if err != nil {
+			return nil, err
+		}
+
+		// send MFA code via email
+		err = s.mailer.SendMFACode(user.Email, user.Name, code)
+		if err != nil {
+			// log error but don't fail the request
+			// in production, you might want to handle this differently
+		}
+
+		return nil, domain.ErrMFARequired
 	}
 
 	// generate tokens
@@ -463,4 +488,132 @@ func (s *AuthService) sendVerificationEmail(email, token string) error {
 `
 
 	return s.mailer.SendEmail(email, subject, htmlBody)
+}
+
+func (s *AuthService) VerifyMFACode(ctx context.Context, req *domain.MFAVerifyRequest) (*domain.MFAVerifyResponse, error) {
+	// get user by email
+	user, err := s.userRepo.GetByEmail(ctx, req.Email)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return nil, domain.ErrInvalidCredentials
+		}
+		return nil, err
+	}
+
+	// check if MFA is enabled
+	if !user.MFAEnabled {
+		return nil, domain.ErrMFANotEnabled
+	}
+
+	// check if MFA code exists
+	if user.MFACode == nil {
+		return nil, domain.ErrInvalidMFACode
+	}
+
+	// verify MFA code
+	if !mfa.IsCodeValid(req.Code, *user.MFACode, user.MFACodeExpiresAt) {
+		// check if code is expired
+		if user.MFACodeExpiresAt != nil && time.Now().After(*user.MFACodeExpiresAt) {
+			return nil, domain.ErrMFACodeExpired
+		}
+		return nil, domain.ErrInvalidMFACode
+	}
+
+	// clear MFA code
+	err = s.userRepo.ClearMFACode(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// generate tokens
+	token, err := s.jwtManager.Generate(user.ID, user.Email)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, err := s.jwtManager.GenerateRefreshToken(user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// store refresh token
+	refreshExpiresAt := time.Now().Add(7 * 24 * time.Hour) // 7 days
+	err = s.userRepo.UpdateRefreshToken(ctx, user.ID, refreshToken, refreshExpiresAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.MFAVerifyResponse{
+		Token:        token,
+		RefreshToken: refreshToken,
+		User:         *user,
+	}, nil
+}
+
+func (s *AuthService) EnableMFA(ctx context.Context, userID uuid.UUID, req *domain.MFAEnableRequest) (*domain.MFAEnableResponse, error) {
+	// get user by ID
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// check if MFA is already enabled
+	if user.MFAEnabled {
+		return nil, domain.ErrMFAAlreadyEnabled
+	}
+
+	// verify password
+	if !password.Verify(req.Password, user.Password) {
+		return nil, domain.ErrInvalidCredentials
+	}
+
+	// enable MFA
+	err = s.userRepo.EnableMFA(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.MFAEnableResponse{
+		Message: "Multi-factor authentication has been enabled successfully",
+	}, nil
+}
+
+func (s *AuthService) DisableMFA(ctx context.Context, userID uuid.UUID, req *domain.MFADisableRequest) (*domain.MFADisableResponse, error) {
+	// get user by ID
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// check if MFA is enabled
+	if !user.MFAEnabled {
+		return nil, domain.ErrMFANotEnabled
+	}
+
+	// verify password
+	if !password.Verify(req.Password, user.Password) {
+		return nil, domain.ErrInvalidCredentials
+	}
+
+	// disable MFA
+	err = s.userRepo.DisableMFA(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.MFADisableResponse{
+		Message: "Multi-factor authentication has been disabled successfully",
+	}, nil
+}
+
+func (s *AuthService) GetMFAStatus(ctx context.Context, userID uuid.UUID) (*domain.MFAStatusResponse, error) {
+	// get user by ID
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.MFAStatusResponse{
+		MFAEnabled: user.MFAEnabled,
+	}, nil
 }

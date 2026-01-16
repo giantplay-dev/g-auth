@@ -7,7 +7,9 @@ A modern, production-ready authentication service built with Go, featuring JWT-b
 - **User Registration & Authentication**: Secure user registration and login with JWT tokens
 - **Email Verification**: Required email verification before login
 - **Password Reset**: Secure password reset functionality with email tokens
+- **Multi-Factor Authentication (MFA)**: Optional email-based MFA with 6-digit codes
 - **Password Security**: bcrypt password hashing with proper salt rounds
+- **Account Lockout**: Automatic account lockout after 5 failed login attempts (15-minute duration)
 - **Clean Architecture**: Separation of concerns with domain, service, repository, and handler layers
 - **Middleware Support**: 
   - Authentication middleware for protected routes
@@ -290,6 +292,7 @@ The project follows **Clean Architecture** principles:
 - **Rate Limiting**: API rate limiting per IP address to prevent abuse
 - **JWT Authentication**: Secure token-based authentication
 - **Email Verification**: Required email verification before login
+- **Multi-Factor Authentication**: Optional email-based MFA for enhanced security
 - **SQL Injection Prevention**: All queries use parameterized statements
 
 ## 🤝 Contributing
@@ -315,7 +318,7 @@ For issues and questions, please open an issue in the repository.
 - [x] Add email verification
 - [x] Add API rate limiting
 - [x] Implement account lockout after failed attempts
-- [ ] Implement multi-factor authentication (MFA) with TOTP or SMS
+- [x] Implement multi-factor authentication (MFA) using email
 - [ ] Implement role-based access control (RBAC)
 - [ ] Implement audit logging for all authentication events (login, logout, failures)
 - [ ] Add GDPR compliance features (e.g., data export, account deletion requests)
@@ -332,6 +335,7 @@ For more detailed documentation, see the [wiki](./wiki/) folder:
 - [Architecture Overview](./wiki/architecture.md)
 - [Deployment Guide](./wiki/deployment.md)
 - [Mailer Configuration](./wiki/mailer.md)
+- [Multi-Factor Authentication](./wiki/mfa.md)
 - [API Documentation](./wiki/api-docs/)
 
 ---

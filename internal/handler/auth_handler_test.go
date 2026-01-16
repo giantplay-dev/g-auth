@@ -127,6 +127,26 @@ func (m *MockUserRepository) UnlockAccount(ctx context.Context, userID uuid.UUID
 	return args.Error(0)
 }
 
+func (m *MockUserRepository) UpdateMFACode(ctx context.Context, userID uuid.UUID, code string, expiresAt time.Time) error {
+	args := m.Called(ctx, userID, code, expiresAt)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) ClearMFACode(ctx context.Context, userID uuid.UUID) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) EnableMFA(ctx context.Context, userID uuid.UUID) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) DisableMFA(ctx context.Context, userID uuid.UUID) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
 func setupTestHandler() (*AuthHandler, *MockUserRepository) {
 	mockRepo := new(MockUserRepository)
 	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
