@@ -1,4 +1,4 @@
-.PHONY: run build test migrate-up migrate-down migrate-all-up migrate-all-down migrate-001-up migrate-001-down migrate-002-up migrate-002-down docker-up docker-down docker-migrate docker-build docker-run clean help dev
+.PHONY: run build test coverage migrate-up migrate-down migrate-001-up migrate-001-down migrate-002-up migrate-002-down migrate-003-up migrate-003-down migrate-004-up migrate-004-down migrate-005-up migrate-005-down docker-up docker-down docker-migrate docker-build docker-run clean help dev mod-tidy
 
 # Load environment variables
 include .env
@@ -10,6 +10,8 @@ help:
 	@echo "  run                 - Run the application"
 	@echo "  build               - Build the application"
 	@echo "  test                - Run all tests"
+	@echo "  coverage            - Run tests with coverage report"
+	@echo "  mod-tidy            - Tidy and verify go modules"
 	@echo "  migrate-up          - Run all up migrations"
 	@echo "  migrate-down        - Run all down migrations"
 	@echo "  migrate-001-up      - Run migration 001 up"
@@ -38,6 +40,15 @@ build:
 
 test:
 	go test -v ./...
+
+coverage:
+	go test -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+mod-tidy:
+	go mod tidy
+	go mod verify
 
 # Migration commands using psql
 migrate-001-up:
@@ -109,7 +120,7 @@ docker-migrate: docker-up
 
 # Build and run service in Docker
 docker-build:
-	docker build -t auth-service:latest .
+	docker build -t auth-service:latest -f deploy/Dockerfile .
 
 docker-run:
 	docker run --network host --env-file .env -e DATABASE_URL=postgres://postgres:postgres@localhost:5432/g-auth?sslmode=disable auth-service:latest
