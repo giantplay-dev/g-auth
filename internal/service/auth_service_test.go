@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"g-auth/internal/domain"
 	"g-auth/pkg/jwt"
 	"g-auth/pkg/mailer"
+	"g-auth/pkg/password"
 )
 
 // MockUserRepository is a mock implementation of UserRepository
@@ -117,6 +119,1050 @@ func (m *MockUserRepository) LockAccount(ctx context.Context, userID uuid.UUID, 
 func (m *MockUserRepository) UnlockAccount(ctx context.Context, userID uuid.UUID) error {
 	args := m.Called(ctx, userID)
 	return args.Error(0)
+}
+
+// MockMailer is a mock implementation of Mailer that can track calls and fail on demand
+type MockMailer struct {
+	mock.Mock
+}
+
+func (m *MockMailer) SendEmail(to, subject, body string) error {
+	args := m.Called(to, subject, body)
+	return args.Error(0)
+}
+
+func setupTestService() (*AuthService, *MockUserRepository) {
+	mockRepo := new(MockUserRepository)
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	mockMailer := mailer.NewNoOpMailer()
+	service := NewAuthService(mockRepo, jwtManager, mockMailer)
+	return service, mockRepo
+}
+
+func TestNewAuthService(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	mockMailer := mailer.NewNoOpMailer()
+
+	service := NewAuthService(mockRepo, jwtManager, mockMailer)
+
+	assert.NotNil(t, service)
+	assert.Equal(t, mockRepo, service.userRepo)
+	assert.Equal(t, jwtManager, service.jwtManager)
+	assert.Equal(t, mockMailer, service.mailer)
+}
+
+func TestAuthService_Register_Success(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	req := &domain.RegisterRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+		Name:     "Test User",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrUserNotFound)
+	mockRepo.On("Create", ctx, mock.AnythingOfType("*domain.User")).Return(nil)
+	mockRepo.On("UpdateVerificationToken", ctx, mock.AnythingOfType("uuid.UUID"), mock.AnythingOfType("string"), mock.AnythingOfType("time.Time")).Return(nil)
+
+	resp, err := service.Register(ctx, req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Contains(t, resp.Message, "Registration successful")
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_Register_UserAlreadyExists(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	req := &domain.RegisterRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+		Name:     "Test User",
+	}
+
+	existingUser := &domain.User{
+		ID:    uuid.New(),
+		Email: "test@example.com",
+	}
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(existingUser, nil)
+
+	resp, err := service.Register(ctx, req)
+
+	assert.Error(t, err)
+	assert.Equal(t, domain.ErrUserAlreadyExists, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_Register_GetByEmailError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	req := &domain.RegisterRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+		Name:     "Test User",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(nil, errors.New("database error"))
+
+	resp, err := service.Register(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_Register_CreateError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	req := &domain.RegisterRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+		Name:     "Test User",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrUserNotFound)
+	mockRepo.On("Create", ctx, mock.AnythingOfType("*domain.User")).Return(errors.New("create error"))
+
+	resp, err := service.Register(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_Register_UpdateVerificationTokenError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	req := &domain.RegisterRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+		Name:     "Test User",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrUserNotFound)
+	mockRepo.On("Create", ctx, mock.AnythingOfType("*domain.User")).Return(nil)
+	mockRepo.On("UpdateVerificationToken", ctx, mock.AnythingOfType("uuid.UUID"), mock.AnythingOfType("string"), mock.AnythingOfType("time.Time")).Return(errors.New("update error"))
+
+	resp, err := service.Register(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_Login_Success(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	hashedPassword, _ := password.Hash("password123")
+	userID := uuid.New()
+	user := &domain.User{
+		ID:            userID,
+		Email:         "test@example.com",
+		Password:      hashedPassword,
+		Name:          "Test User",
+		EmailVerified: true,
+	}
+
+	req := &domain.LoginRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+	mockRepo.On("UpdateRefreshToken", ctx, userID, mock.AnythingOfType("string"), mock.AnythingOfType("time.Time")).Return(nil)
+
+	resp, err := service.Login(ctx, req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.NotEmpty(t, resp.Token)
+	assert.NotEmpty(t, resp.RefreshToken)
+	assert.Equal(t, userID, resp.User.ID)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_Login_UserNotFound(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	req := &domain.LoginRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrUserNotFound)
+
+	resp, err := service.Login(ctx, req)
+
+	assert.Error(t, err)
+	assert.Equal(t, domain.ErrInvalidCredentials, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_Login_GetByEmailError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	req := &domain.LoginRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(nil, errors.New("database error"))
+
+	resp, err := service.Login(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_Login_ExpiredLock(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	hashedPassword, _ := password.Hash("password123")
+	userID := uuid.New()
+	expiredLockTime := time.Now().Add(-1 * time.Minute)
+	user := &domain.User{
+		ID:            userID,
+		Email:         "test@example.com",
+		Password:      hashedPassword,
+		Name:          "Test User",
+		EmailVerified: true,
+		IsLocked:      true,
+		LockedUntil:   &expiredLockTime,
+	}
+
+	req := &domain.LoginRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+	mockRepo.On("UnlockAccount", ctx, userID).Return(nil)
+	mockRepo.On("UpdateRefreshToken", ctx, userID, mock.AnythingOfType("string"), mock.AnythingOfType("time.Time")).Return(nil)
+
+	resp, err := service.Login(ctx, req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_Login_UnlockAccountError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	hashedPassword, _ := password.Hash("password123")
+	userID := uuid.New()
+	expiredLockTime := time.Now().Add(-1 * time.Minute)
+	user := &domain.User{
+		ID:            userID,
+		Email:         "test@example.com",
+		Password:      hashedPassword,
+		Name:          "Test User",
+		EmailVerified: true,
+		IsLocked:      true,
+		LockedUntil:   &expiredLockTime,
+	}
+
+	req := &domain.LoginRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+	mockRepo.On("UnlockAccount", ctx, userID).Return(errors.New("unlock error"))
+
+	resp, err := service.Login(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_Login_IncrementFailedAttemptsError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	hashedPassword, _ := password.Hash("password123")
+	userID := uuid.New()
+	user := &domain.User{
+		ID:            userID,
+		Email:         "test@example.com",
+		Password:      hashedPassword,
+		Name:          "Test User",
+		EmailVerified: true,
+	}
+
+	req := &domain.LoginRequest{
+		Email:    "test@example.com",
+		Password: "wrongpassword",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+	mockRepo.On("IncrementFailedAttempts", ctx, userID).Return(errors.New("increment error"))
+
+	resp, err := service.Login(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_Login_LockAccountError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	hashedPassword, _ := password.Hash("password123")
+	userID := uuid.New()
+	user := &domain.User{
+		ID:             userID,
+		Email:          "test@example.com",
+		Password:       hashedPassword,
+		Name:           "Test User",
+		EmailVerified:  true,
+		FailedAttempts: 4,
+	}
+
+	req := &domain.LoginRequest{
+		Email:    "test@example.com",
+		Password: "wrongpassword",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+	mockRepo.On("IncrementFailedAttempts", ctx, userID).Return(nil)
+	mockRepo.On("LockAccount", ctx, userID, mock.AnythingOfType("time.Time")).Return(errors.New("lock error"))
+
+	resp, err := service.Login(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_Login_ResetFailedAttemptsError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	hashedPassword, _ := password.Hash("password123")
+	userID := uuid.New()
+	user := &domain.User{
+		ID:             userID,
+		Email:          "test@example.com",
+		Password:       hashedPassword,
+		Name:           "Test User",
+		EmailVerified:  true,
+		FailedAttempts: 2,
+	}
+
+	req := &domain.LoginRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+	mockRepo.On("ResetFailedAttempts", ctx, userID).Return(errors.New("reset error"))
+
+	resp, err := service.Login(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_Login_EmailNotVerified(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	hashedPassword, _ := password.Hash("password123")
+	userID := uuid.New()
+	user := &domain.User{
+		ID:            userID,
+		Email:         "test@example.com",
+		Password:      hashedPassword,
+		Name:          "Test User",
+		EmailVerified: false, // Email not verified
+	}
+
+	req := &domain.LoginRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+
+	resp, err := service.Login(ctx, req)
+
+	assert.Error(t, err)
+	assert.Equal(t, domain.ErrEmailNotVerified, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_Login_UpdateRefreshTokenError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	hashedPassword, _ := password.Hash("password123")
+	userID := uuid.New()
+	user := &domain.User{
+		ID:            userID,
+		Email:         "test@example.com",
+		Password:      hashedPassword,
+		Name:          "Test User",
+		EmailVerified: true,
+	}
+
+	req := &domain.LoginRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+	mockRepo.On("UpdateRefreshToken", ctx, userID, mock.AnythingOfType("string"), mock.AnythingOfType("time.Time")).Return(errors.New("update error"))
+
+	resp, err := service.Login(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_RefreshToken_Success(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	refreshToken, _ := jwtManager.GenerateRefreshToken(userID)
+	user := &domain.User{
+		ID:    userID,
+		Email: "test@example.com",
+		Name:  "Test User",
+	}
+
+	req := &domain.RefreshTokenRequest{
+		RefreshToken: refreshToken,
+	}
+
+	mockRepo.On("GetByRefreshToken", ctx, refreshToken).Return(user, nil)
+	mockRepo.On("UpdateRefreshToken", ctx, userID, mock.AnythingOfType("string"), mock.AnythingOfType("time.Time")).Return(nil)
+
+	resp, err := service.RefreshToken(ctx, req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.NotEmpty(t, resp.Token)
+	assert.NotEmpty(t, resp.RefreshToken)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_RefreshToken_GetByRefreshTokenError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	refreshToken, _ := jwtManager.GenerateRefreshToken(userID)
+
+	req := &domain.RefreshTokenRequest{
+		RefreshToken: refreshToken,
+	}
+
+	mockRepo.On("GetByRefreshToken", ctx, refreshToken).Return(nil, errors.New("database error"))
+
+	resp, err := service.RefreshToken(ctx, req)
+
+	assert.Error(t, err)
+	assert.Equal(t, domain.ErrInvalidCredentials, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_RefreshToken_ExpiredRefreshToken(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	refreshToken, _ := jwtManager.GenerateRefreshToken(userID)
+	expiredTime := time.Now().Add(-1 * time.Hour)
+	user := &domain.User{
+		ID:                    userID,
+		Email:                 "test@example.com",
+		RefreshTokenExpiresAt: &expiredTime,
+	}
+
+	req := &domain.RefreshTokenRequest{
+		RefreshToken: refreshToken,
+	}
+
+	mockRepo.On("GetByRefreshToken", ctx, refreshToken).Return(user, nil)
+
+	resp, err := service.RefreshToken(ctx, req)
+
+	assert.Error(t, err)
+	assert.Equal(t, domain.ErrInvalidCredentials, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_RefreshToken_UpdateRefreshTokenError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	refreshToken, _ := jwtManager.GenerateRefreshToken(userID)
+	user := &domain.User{
+		ID:    userID,
+		Email: "test@example.com",
+	}
+
+	req := &domain.RefreshTokenRequest{
+		RefreshToken: refreshToken,
+	}
+
+	mockRepo.On("GetByRefreshToken", ctx, refreshToken).Return(user, nil)
+	mockRepo.On("UpdateRefreshToken", ctx, userID, mock.AnythingOfType("string"), mock.AnythingOfType("time.Time")).Return(errors.New("update error"))
+
+	resp, err := service.RefreshToken(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_GetUserByID(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	user := &domain.User{
+		ID:    userID,
+		Email: "test@example.com",
+		Name:  "Test User",
+	}
+
+	mockRepo.On("GetByID", ctx, userID).Return(user, nil)
+
+	result, err := service.GetUserByID(ctx, userID)
+
+	assert.NoError(t, err)
+	assert.Equal(t, user, result)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_GetUserByID_NotFound(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+
+	mockRepo.On("GetByID", ctx, userID).Return(nil, domain.ErrUserNotFound)
+
+	result, err := service.GetUserByID(ctx, userID)
+
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_RequestPasswordReset_UserNotFound(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	req := &domain.PasswordResetRequest{
+		Email: "nonexistent@example.com",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "nonexistent@example.com").Return(nil, domain.ErrUserNotFound)
+
+	resp, err := service.RequestPasswordReset(ctx, req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Contains(t, resp.Message, "If the email exists")
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_RequestPasswordReset_GetByEmailError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	req := &domain.PasswordResetRequest{
+		Email: "test@example.com",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(nil, errors.New("database error"))
+
+	resp, err := service.RequestPasswordReset(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_RequestPasswordReset_UpdateResetTokenError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	user := &domain.User{
+		ID:    userID,
+		Email: "test@example.com",
+		Name:  "Test User",
+	}
+
+	req := &domain.PasswordResetRequest{
+		Email: "test@example.com",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+	mockRepo.On("UpdateResetToken", ctx, userID, mock.AnythingOfType("string"), mock.AnythingOfType("time.Time")).Return(errors.New("update error"))
+
+	resp, err := service.RequestPasswordReset(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_ResetPassword_Success(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	validExpiry := time.Now().Add(1 * time.Hour)
+	user := &domain.User{
+		ID:                  userID,
+		Email:               "test@example.com",
+		ResetTokenExpiresAt: &validExpiry,
+	}
+
+	req := &domain.PasswordResetConfirmRequest{
+		Token:    "valid-token",
+		Password: "newpassword123",
+	}
+
+	mockRepo.On("GetByResetToken", ctx, "valid-token").Return(user, nil)
+	mockRepo.On("UpdatePassword", ctx, userID, mock.AnythingOfType("string")).Return(nil)
+	mockRepo.On("ClearResetToken", ctx, userID).Return(nil)
+
+	resp, err := service.ResetPassword(ctx, req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Contains(t, resp.Message, "Password has been reset successfully")
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_ResetPassword_TokenNotFound(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	req := &domain.PasswordResetConfirmRequest{
+		Token:    "invalid-token",
+		Password: "newpassword123",
+	}
+
+	mockRepo.On("GetByResetToken", ctx, "invalid-token").Return(nil, domain.ErrUserNotFound)
+
+	resp, err := service.ResetPassword(ctx, req)
+
+	assert.Error(t, err)
+	assert.Equal(t, domain.ErrInvalidResetToken, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_ResetPassword_GetByResetTokenError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	req := &domain.PasswordResetConfirmRequest{
+		Token:    "some-token",
+		Password: "newpassword123",
+	}
+
+	mockRepo.On("GetByResetToken", ctx, "some-token").Return(nil, errors.New("database error"))
+
+	resp, err := service.ResetPassword(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_ResetPassword_NilExpiresAt(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	user := &domain.User{
+		ID:                  userID,
+		Email:               "test@example.com",
+		ResetTokenExpiresAt: nil,
+	}
+
+	req := &domain.PasswordResetConfirmRequest{
+		Token:    "valid-token",
+		Password: "newpassword123",
+	}
+
+	mockRepo.On("GetByResetToken", ctx, "valid-token").Return(user, nil)
+
+	resp, err := service.ResetPassword(ctx, req)
+
+	assert.Error(t, err)
+	assert.Equal(t, domain.ErrResetTokenExpired, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_ResetPassword_UpdatePasswordError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	validExpiry := time.Now().Add(1 * time.Hour)
+	user := &domain.User{
+		ID:                  userID,
+		Email:               "test@example.com",
+		ResetTokenExpiresAt: &validExpiry,
+	}
+
+	req := &domain.PasswordResetConfirmRequest{
+		Token:    "valid-token",
+		Password: "newpassword123",
+	}
+
+	mockRepo.On("GetByResetToken", ctx, "valid-token").Return(user, nil)
+	mockRepo.On("UpdatePassword", ctx, userID, mock.AnythingOfType("string")).Return(errors.New("update error"))
+
+	resp, err := service.ResetPassword(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_ResetPassword_ClearResetTokenError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	validExpiry := time.Now().Add(1 * time.Hour)
+	user := &domain.User{
+		ID:                  userID,
+		Email:               "test@example.com",
+		ResetTokenExpiresAt: &validExpiry,
+	}
+
+	req := &domain.PasswordResetConfirmRequest{
+		Token:    "valid-token",
+		Password: "newpassword123",
+	}
+
+	mockRepo.On("GetByResetToken", ctx, "valid-token").Return(user, nil)
+	mockRepo.On("UpdatePassword", ctx, userID, mock.AnythingOfType("string")).Return(nil)
+	mockRepo.On("ClearResetToken", ctx, userID).Return(errors.New("clear error"))
+
+	resp, err := service.ResetPassword(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_VerifyEmail_Success(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	validExpiry := time.Now().Add(1 * time.Hour)
+	user := &domain.User{
+		ID:                         userID,
+		Email:                      "test@example.com",
+		VerificationTokenExpiresAt: &validExpiry,
+	}
+
+	req := &domain.EmailVerificationRequest{
+		Token: "valid-token",
+	}
+
+	mockRepo.On("GetByVerificationToken", ctx, "valid-token").Return(user, nil)
+	mockRepo.On("VerifyEmail", ctx, userID).Return(nil)
+
+	resp, err := service.VerifyEmail(ctx, req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Contains(t, resp.Message, "Email verified successfully")
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_VerifyEmail_TokenNotFound(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	req := &domain.EmailVerificationRequest{
+		Token: "invalid-token",
+	}
+
+	mockRepo.On("GetByVerificationToken", ctx, "invalid-token").Return(nil, domain.ErrUserNotFound)
+
+	resp, err := service.VerifyEmail(ctx, req)
+
+	assert.Error(t, err)
+	assert.Equal(t, domain.ErrInvalidVerificationToken, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_VerifyEmail_GetByVerificationTokenError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	req := &domain.EmailVerificationRequest{
+		Token: "some-token",
+	}
+
+	mockRepo.On("GetByVerificationToken", ctx, "some-token").Return(nil, errors.New("database error"))
+
+	resp, err := service.VerifyEmail(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_VerifyEmail_ExpiredToken(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	expiredTime := time.Now().Add(-1 * time.Hour)
+	user := &domain.User{
+		ID:                         userID,
+		Email:                      "test@example.com",
+		VerificationTokenExpiresAt: &expiredTime,
+	}
+
+	req := &domain.EmailVerificationRequest{
+		Token: "expired-token",
+	}
+
+	mockRepo.On("GetByVerificationToken", ctx, "expired-token").Return(user, nil)
+
+	resp, err := service.VerifyEmail(ctx, req)
+
+	assert.Error(t, err)
+	assert.Equal(t, domain.ErrVerificationTokenExpired, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_VerifyEmail_NilExpiresAt(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	user := &domain.User{
+		ID:                         userID,
+		Email:                      "test@example.com",
+		VerificationTokenExpiresAt: nil,
+	}
+
+	req := &domain.EmailVerificationRequest{
+		Token: "valid-token",
+	}
+
+	mockRepo.On("GetByVerificationToken", ctx, "valid-token").Return(user, nil)
+	mockRepo.On("VerifyEmail", ctx, userID).Return(nil)
+
+	resp, err := service.VerifyEmail(ctx, req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_VerifyEmail_VerifyEmailError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	user := &domain.User{
+		ID:    userID,
+		Email: "test@example.com",
+	}
+
+	req := &domain.EmailVerificationRequest{
+		Token: "valid-token",
+	}
+
+	mockRepo.On("GetByVerificationToken", ctx, "valid-token").Return(user, nil)
+	mockRepo.On("VerifyEmail", ctx, userID).Return(errors.New("verify error"))
+
+	resp, err := service.VerifyEmail(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_ResendVerification_Success(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	user := &domain.User{
+		ID:            userID,
+		Email:         "test@example.com",
+		EmailVerified: false,
+	}
+
+	req := &domain.ResendVerificationRequest{
+		Email: "test@example.com",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+	mockRepo.On("UpdateVerificationToken", ctx, userID, mock.AnythingOfType("string"), mock.AnythingOfType("time.Time")).Return(nil)
+
+	resp, err := service.ResendVerification(ctx, req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Contains(t, resp.Message, "Verification email sent successfully")
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_ResendVerification_UserNotFound(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	req := &domain.ResendVerificationRequest{
+		Email: "nonexistent@example.com",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "nonexistent@example.com").Return(nil, domain.ErrUserNotFound)
+
+	resp, err := service.ResendVerification(ctx, req)
+
+	assert.Error(t, err)
+	assert.Equal(t, domain.ErrUserNotFound, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_ResendVerification_GetByEmailError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	req := &domain.ResendVerificationRequest{
+		Email: "test@example.com",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(nil, errors.New("database error"))
+
+	resp, err := service.ResendVerification(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_ResendVerification_AlreadyVerified(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	user := &domain.User{
+		ID:            userID,
+		Email:         "test@example.com",
+		EmailVerified: true,
+	}
+
+	req := &domain.ResendVerificationRequest{
+		Email: "test@example.com",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+
+	resp, err := service.ResendVerification(ctx, req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Contains(t, resp.Message, "Email is already verified")
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_ResendVerification_UpdateVerificationTokenError(t *testing.T) {
+	service, mockRepo := setupTestService()
+	ctx := context.Background()
+
+	userID := uuid.New()
+	user := &domain.User{
+		ID:            userID,
+		Email:         "test@example.com",
+		EmailVerified: false,
+	}
+
+	req := &domain.ResendVerificationRequest{
+		Email: "test@example.com",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+	mockRepo.On("UpdateVerificationToken", ctx, userID, mock.AnythingOfType("string"), mock.AnythingOfType("time.Time")).Return(errors.New("update error"))
+
+	resp, err := service.ResendVerification(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAuthService_ResendVerification_SendEmailError(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)
+	mockMailer := new(MockMailer)
+	service := NewAuthService(mockRepo, jwtManager, mockMailer)
+
+	ctx := context.Background()
+	userID := uuid.New()
+	user := &domain.User{
+		ID:            userID,
+		Email:         "test@example.com",
+		EmailVerified: false,
+	}
+
+	req := &domain.ResendVerificationRequest{
+		Email: "test@example.com",
+	}
+
+	mockRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+	mockRepo.On("UpdateVerificationToken", ctx, userID, mock.AnythingOfType("string"), mock.AnythingOfType("time.Time")).Return(nil)
+	mockMailer.On("SendEmail", "test@example.com", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(errors.New("email error"))
+
+	resp, err := service.ResendVerification(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	mockRepo.AssertExpectations(t)
+	mockMailer.AssertExpectations(t)
 }
 
 func TestAuthService_RequestPasswordReset(t *testing.T) {
