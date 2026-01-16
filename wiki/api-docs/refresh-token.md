@@ -66,6 +66,7 @@ Content-Type: application/json
     "id": "123e4567-e89b-12d3-a456-426614174000",
     "email": "user@example.com",
     "name": "John Doe",
+    "email_verified": true,
     "created_at": "2026-01-10T10:00:00Z",
     "updated_at": "2026-01-10T10:00:00Z"
   }
@@ -81,6 +82,7 @@ Content-Type: application/json
 | user.id | string (UUID) | Unique user identifier |
 | user.email | string | User's email address |
 | user.name | string | User's full name |
+| user.email_verified | boolean | Whether the user's email has been verified |
 | user.created_at | string (ISO 8601) | Account creation timestamp |
 | user.updated_at | string (ISO 8601) | Last update timestamp |
 
@@ -137,6 +139,7 @@ curl -X POST http://localhost:8080/api/auth/refresh \
     "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
     "email": "user@example.com",
     "name": "User Name",
+    "email_verified": true,
     "created_at": "2026-01-10T15:30:00Z",
     "updated_at": "2026-01-10T15:30:00Z"
   }

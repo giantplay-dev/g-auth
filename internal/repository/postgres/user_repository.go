@@ -84,13 +84,6 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*domain.
 		return nil, err
 	}
 
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, domain.ErrUserNotFound
-		}
-		return nil, err
-	}
-
 	user.ID, err = uuid.Parse(idStr)
 	if err != nil {
 		return nil, err

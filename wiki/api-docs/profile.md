@@ -40,6 +40,7 @@ Authorization: Bearer <jwt-token>
   "id": "123e4567-e89b-12d3-a456-426614174000",
   "email": "user@example.com",
   "name": "John Doe",
+  "email_verified": true,
   "created_at": "2026-01-10T10:00:00Z",
   "updated_at": "2026-01-10T10:00:00Z"
 }
@@ -52,6 +53,7 @@ Authorization: Bearer <jwt-token>
 | id | string (UUID) | Unique user identifier |
 | email | string | User's email address |
 | name | string | User's full name |
+| email_verified | boolean | Whether the user's email has been verified |
 | created_at | string (ISO 8601) | Account creation timestamp |
 | updated_at | string (ISO 8601) | Last update timestamp |
 
@@ -111,6 +113,7 @@ curl -X GET http://localhost:8080/api/me \
   "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
   "email": "john.doe@example.com",
   "name": "John Doe",
+  "email_verified": true,
   "created_at": "2026-01-10T15:30:00Z",
   "updated_at": "2026-01-10T15:30:00Z"
 }

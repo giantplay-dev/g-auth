@@ -111,14 +111,7 @@ curl -X POST http://localhost:8080/api/auth/register \
 **Example Response**:
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-    "email": "john.doe@example.com",
-    "name": "John Doe",
-    "created_at": "2026-01-10T15:30:00Z",
-    "updated_at": "2026-01-10T15:30:00Z"
-  }
+  "message": "Registration successful. Please check your email to verify your account."
 }
 ```
 
