@@ -319,7 +319,7 @@ For issues and questions, please open an issue in the repository.
 - [x] Add API rate limiting
 - [x] Implement account lockout after failed attempts
 - [x] Implement multi-factor authentication (MFA) using email
-- [ ] Implement role-based access control (RBAC)
+- [x] Implement role-based access control (RBAC)
 - [ ] Implement audit logging for all authentication events (login, logout, failures)
 - [ ] Add GDPR compliance features (e.g., data export, account deletion requests)
 - [ ] Add password strength policies and enforcement during registration/reset
