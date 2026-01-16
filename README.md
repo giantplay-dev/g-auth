@@ -34,6 +34,7 @@ A modern, production-ready authentication service built with Go, featuring JWT-b
 - **Logging**: Uber Zap (structured logging)
 - **Configuration**: godotenv for environment management
 - **UUID**: Google UUID library
+- **Email**: gomail for SMTP email sending
 
 ## 📁 Project Structure
 
@@ -52,6 +53,7 @@ g-auth/
 │   ├── middleware/
 │   │   ├── auth.go              # JWT authentication middleware
 │   │   ├── logging.go           # Request logging middleware
+│   │   ├── rate_limit.go        # Rate limiting middleware
 │   │   └── trace.go             # Request tracing middleware
 │   ├── repository/
 │   │   ├── user_repository.go   # Repository interface
@@ -70,6 +72,8 @@ g-auth/
 │   │   └── jwt.go               # JWT token management
 │   ├── logger/
 │   │   └── logger.go            # Logger initialization
+│   ├── mailer/
+│   │   └── mailer.go            # Email sending utilities
 │   └── password/
 │       └── password.go          # Password hashing utilities
 ├── wiki/                         # Documentation
@@ -95,8 +99,13 @@ Create a `.env` file in the root directory:
 ```env
 APP_ENV=development
 APP_PORT=8080
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/authdb?sslmode=disable
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/g-auth?sslmode=disable
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM=your-email@gmail.com
 RATE_LIMIT=10
 RATE_LIMIT_BURST=20
 ```
@@ -108,19 +117,26 @@ RATE_LIMIT_BURST=20
 #### Option A: Using Docker
 
 ```bash
-make docker-up
+make dev
 ```
 
 This will:
 - Start a PostgreSQL container
-- Create the `authdb` database
-- Run migrations automatically
+- Create the `g-auth` database
+- Run all migrations automatically
+
+Or use individual commands:
+
+```bash
+make docker-up     # Start PostgreSQL
+make docker-migrate # Run migrations
+```
 
 #### Option B: Using Local PostgreSQL
 
 ```bash
 # Ensure PostgreSQL is running
-psql -U postgres -c "CREATE DATABASE authdb;"
+psql -U postgres -c "CREATE DATABASE g-auth;"
 
 # Run all migrations
 make migrate-up
@@ -131,6 +147,9 @@ Or run migrations individually:
 ```bash
 make migrate-001-up  # Create users table
 make migrate-002-up  # Add password reset fields
+make migrate-003-up  # Add refresh token fields
+make migrate-004-up  # Add email verification fields
+make migrate-005-up  # Add account lockout fields
 ```
 
 ### 4. Install Dependencies
@@ -185,6 +204,12 @@ make migrate-001-up    # Run migration 001 (users table) up
 make migrate-001-down  # Run migration 001 (users table) down
 make migrate-002-up    # Run migration 002 (password reset) up
 make migrate-002-down  # Run migration 002 (password reset) down
+make migrate-003-up    # Run migration 003 (refresh token) up
+make migrate-003-down  # Run migration 003 (refresh token) down
+make migrate-004-up    # Run migration 004 (email verification) up
+make migrate-004-down  # Run migration 004 (email verification) down
+make migrate-005-up    # Run migration 005 (account lockout) up
+make migrate-005-down  # Run migration 005 (account lockout) down
 
 # Docker
 make docker-up         # Start PostgreSQL in Docker
@@ -299,10 +324,9 @@ For issues and questions, please open an issue in the repository.
 For more detailed documentation, see the [wiki](./wiki/) folder:
 
 - [Architecture Overview](./wiki/architecture.md)
-- [API Reference](./wiki/api-reference.md)
 - [Deployment Guide](./wiki/deployment.md)
-- [Security Best Practices](./wiki/security.md)
-- [Troubleshooting](./wiki/troubleshooting.md)
+- [Mailer Configuration](./wiki/mailer.md)
+- [API Documentation](./wiki/api-docs/)
 
 ---
 
