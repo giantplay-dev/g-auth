@@ -315,11 +315,15 @@ For issues and questions, please open an issue in the repository.
 - [x] Add email verification
 - [x] Add API rate limiting
 - [x] Implement account lockout after failed attempts
+- [ ] Implement multi-factor authentication (MFA) with TOTP or SMS
 - [ ] Implement role-based access control (RBAC)
-- [ ] Add comprehensive API documentation with Swagger
+- [ ] Implement audit logging for all authentication events (login, logout, failures)
+- [ ] Add GDPR compliance features (e.g., data export, account deletion requests)
+- [ ] Add password strength policies and enforcement during registration/reset
+- [ ] Implement session management with device tracking and forced logout
 - [ ] Implement graceful shutdown
-- [ ] Add health check with database status
-- [ ] Add OAuth2 integration (Google, GitHub)
+- [ ] Add user profile management (e.g., update email, password, personal details)
+- [ ] Add comprehensive API documentation with Swagger
 
 ## 📖 Additional Documentation
 
