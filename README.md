@@ -13,6 +13,7 @@ A modern, production-ready authentication service built with Go, featuring JWT-b
   - Authentication middleware for protected routes
   - Request logging with structured logging (zap)
   - Distributed tracing with request IDs
+  - API rate limiting per IP address to prevent abuse
 - **Database**: PostgreSQL with connection pooling
 - **API Documentation**: RESTful API design with proper HTTP status codes
 - **Production Ready**: Configurable timeouts, graceful shutdown support
@@ -96,6 +97,8 @@ APP_ENV=development
 APP_PORT=8080
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/authdb?sslmode=disable
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+RATE_LIMIT=10
+RATE_LIMIT_BURST=20
 ```
 
 > ⚠️ **Security Note**: Never commit the `.env` file to version control. Update `JWT_SECRET` in production.
@@ -213,7 +216,7 @@ docker run -p 8080:8080 \
 1. **JWT Secret**: Use a strong, random JWT secret in production
 2. **HTTPS**: Always use HTTPS in production
 3. **Password Policy**: Implement password strength requirements
-4. **Rate Limiting**: Add rate limiting to prevent brute-force attacks
+4. **Rate Limiting**: Configurable per-IP rate limiting implemented to prevent brute-force attacks
 5. **CORS**: Configure CORS properly for your frontend
 6. **Environment Variables**: Never commit secrets to version control
 7. **SQL Injection**: All queries use parameterized statements
@@ -266,13 +269,13 @@ For issues and questions, please open an issue in the repository.
 - [x] Add password reset functionality
 - [x] Implement refresh token mechanism
 - [x] Add email verification
+- [x] Add API rate limiting
 - [ ] Implement role-based access control (RBAC)
-- [ ] Add OAuth2 integration (Google, GitHub)
-- [ ] Add API rate limiting
 - [ ] Implement account lockout after failed attempts
 - [ ] Add comprehensive API documentation with Swagger
 - [ ] Implement graceful shutdown
 - [ ] Add health check with database status
+- [ ] Add OAuth2 integration (Google, GitHub)
 
 ## 📖 Additional Documentation
 

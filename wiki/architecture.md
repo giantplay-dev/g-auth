@@ -192,6 +192,13 @@ type UserRepository interface {
 - Enables distributed tracing
 - Helps with debugging and log correlation
 
+#### Rate Limiting Middleware (`rate_limit.go`)
+- Limits API request rate per IP address
+- Prevents abuse and DoS attacks from individual clients
+- Configurable rate and burst limits per IP
+- Returns 429 Too Many Requests when limit exceeded
+- Supports X-Forwarded-For and X-Real-IP headers for proxy scenarios
+
 ### 6. Package Layer (`pkg/`)
 
 **Purpose**: Reusable utilities and helpers
@@ -219,23 +226,25 @@ type UserRepository interface {
 ```
 1. Client sends POST /api/auth/register
    ↓
-2. TraceMiddleware: Adds trace ID
+2. RateLimitMiddleware: Checks rate limit
    ↓
-3. LoggingMiddleware: Logs request
+3. TraceMiddleware: Adds trace ID
    ↓
-4. Handler: Parses JSON request
+4. LoggingMiddleware: Logs request
    ↓
-5. Service: Validates business rules
+5. Handler: Parses JSON request
    ↓
-6. Service: Hashes password (bcrypt)
+6. Service: Validates business rules
    ↓
-7. Repository: Inserts user into database
+7. Service: Hashes password (bcrypt)
    ↓
-8. Service: Generates JWT token
+8. Repository: Inserts user into database
    ↓
-9. Handler: Returns AuthResponse with token and user
+9. Service: Generates JWT token
    ↓
-10. LoggingMiddleware: Logs response
+10. Handler: Returns AuthResponse with token and user
+    ↓
+11. LoggingMiddleware: Logs response
 ```
 
 ### Login Flow
@@ -243,17 +252,23 @@ type UserRepository interface {
 ```
 1. Client sends POST /api/auth/login
    ↓
-2. Middleware: Tracing + Logging
+2. RateLimitMiddleware: Checks rate limit
    ↓
-3. Handler: Parses credentials
+3. TraceMiddleware: Adds trace ID
    ↓
-4. Service: Fetches user by email
+4. LoggingMiddleware: Logs request
    ↓
-5. Service: Verifies password (bcrypt)
+5. Handler: Parses credentials
    ↓
-6. Service: Generates JWT token
+6. Service: Fetches user by email
    ↓
-7. Handler: Returns AuthResponse
+7. Service: Verifies password (bcrypt)
+   ↓
+8. Service: Generates JWT token
+   ↓
+9. Handler: Returns AuthResponse
+   ↓
+10. LoggingMiddleware: Logs response
 ```
 
 ### Protected Route Flow
@@ -261,15 +276,17 @@ type UserRepository interface {
 ```
 1. Client sends GET /api/me with Authorization header
    ↓
-2. TraceMiddleware: Adds trace ID
+2. RateLimitMiddleware: Checks rate limit
    ↓
-3. LoggingMiddleware: Logs request
+3. TraceMiddleware: Adds trace ID
    ↓
-4. AuthMiddleware: Validates JWT token
+4. LoggingMiddleware: Logs request
    ↓
-5. AuthMiddleware: Extracts user ID, adds to context
+5. AuthMiddleware: Validates JWT token
    ↓
-6. Handler: Retrieves user ID from context
+6. AuthMiddleware: Extracts user ID, adds to context
+   ↓
+7. Handler: Retrieves user ID from context
    ↓
 7. Service: Fetches user by ID
    ↓
@@ -437,7 +454,7 @@ type Config struct {
 
 - [ ] Refresh token mechanism
 - [ ] Token revocation/blacklist
-- [ ] Rate limiting per user/IP
+- [x] Rate limiting per user/IP
 - [ ] Account lockout after failed attempts
 - [ ] IP whitelisting/blacklisting
 - [ ] 2FA support

@@ -48,6 +48,10 @@ DATABASE_URL=postgres://username:password@hostname:5432/dbname?sslmode=require
 
 # JWT Configuration
 JWT_SECRET=your-super-secret-key-minimum-32-characters-long
+
+# Rate Limiting Configuration
+RATE_LIMIT=10                          # Requests per second
+RATE_LIMIT_BURST=20                    # Burst capacity
 ```
 
 ### Environment Variable Details
@@ -58,11 +62,15 @@ JWT_SECRET=your-super-secret-key-minimum-32-characters-long
 | APP_PORT | HTTP server port | 8080 | No |
 | DATABASE_URL | PostgreSQL connection string | - | Yes |
 | JWT_SECRET | Secret key for JWT signing | - | Yes |
+| RATE_LIMIT | Maximum requests per second | 10 | No |
+| RATE_LIMIT_BURST | Burst capacity for rate limiting | 20 | No |
 
 ### Security Notes
 
 - **JWT_SECRET**: Use a strong, random key (minimum 32 characters)
 - **DATABASE_URL**: Use SSL mode (`sslmode=require`) in production
+- **RATE_LIMIT**: Adjust based on expected traffic and server capacity
+- **RATE_LIMIT_BURST**: Allows temporary traffic spikes without blocking legitimate requests
 - Never commit `.env` files to version control
 - Rotate secrets regularly
 - Use secret management tools in production (e.g., AWS Secrets Manager, HashiCorp Vault)

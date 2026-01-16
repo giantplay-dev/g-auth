@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -20,6 +21,8 @@ type Config struct {
 	SMTPUsername           string
 	SMTPPassword           string
 	SMTPFrom               string
+	RateLimit              int // requests per second
+	RateLimitBurst         int // burst capacity
 }
 
 func Load() *Config {
@@ -39,12 +42,23 @@ func Load() *Config {
 		SMTPUsername:           getEnv("SMTP_USERNAME", ""),
 		SMTPPassword:           getEnv("SMTP_PASSWORD", ""),
 		SMTPFrom:               getEnv("SMTP_FROM", ""),
+		RateLimit:              getEnvAsInt("RATE_LIMIT", 10),       // 10 requests per second
+		RateLimitBurst:         getEnvAsInt("RATE_LIMIT_BURST", 20), // burst up to 20
 	}
 }
 
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return defaultValue
+}
+
+func getEnvAsInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
 	}
 	return defaultValue
 }

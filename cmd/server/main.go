@@ -66,6 +66,7 @@ func main() {
 
 	// setup router with middleware
 	router := handler.SetupRoutes()
+	router.Use(middleware.RateLimitMiddleware(cfg))
 	router.Use(middleware.TraceMiddleware)
 	router.Use(middleware.LoggingMiddleware(appLogger))
 
