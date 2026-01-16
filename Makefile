@@ -42,9 +42,9 @@ test:
 	go test -v ./...
 
 coverage:
-	go test -coverprofile=coverage.out ./...
-	go tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report generated: coverage.html"
+	go test -coverprofile=coverage/coverage.out ./...
+	go tool cover -html=coverage/coverage.out -o coverage/coverage.html
+	@echo "Coverage report generated: coverage/coverage.html"
 
 mod-tidy:
 	go mod tidy
