@@ -54,10 +54,16 @@ migrate-003-up:
 migrate-003-down:
 	psql $(DATABASE_URL) -f migrations/003_add_refresh_token_fields.down.sql
 
-migrate-all-up: migrate-001-up migrate-002-up migrate-003-up
+migrate-004-up:
+	psql $(DATABASE_URL) -f migrations/004_add_email_verification_fields.up.sql
+
+migrate-004-down:
+	psql $(DATABASE_URL) -f migrations/004_add_email_verification_fields.down.sql
+
+migrate-all-up: migrate-001-up migrate-002-up migrate-003-up migrate-004-up
 	@echo "All migrations applied successfully"
 
-migrate-all-down: migrate-002-down migrate-001-down
+migrate-all-down: migrate-004-down migrate-003-down migrate-002-down migrate-001-down
 	@echo "All migrations rolled back successfully"
 
 # Legacy aliases for backward compatibility
@@ -87,6 +93,7 @@ docker-migrate: docker-up
 	docker exec -i auth-postgres psql -U postgres -d g-auth -f /dev/stdin < migrations/001_create_users_table.up.sql
 	docker exec -i auth-postgres psql -U postgres -d g-auth -f /dev/stdin < migrations/002_add_password_reset_fields.up.sql
 	docker exec -i auth-postgres psql -U postgres -d g-auth -f /dev/stdin < migrations/003_add_refresh_token_fields.up.sql
+	docker exec -i auth-postgres psql -U postgres -d g-auth -f /dev/stdin < migrations/004_add_email_verification_fields.up.sql
 	@echo "Migrations completed successfully"
 
 # Build and run service in Docker

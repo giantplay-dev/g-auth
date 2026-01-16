@@ -30,6 +30,8 @@ func (h *AuthHandler) SetupRoutes() *mux.Router {
 	r.HandleFunc("/api/auth/refresh", h.RefreshToken).Methods("POST")
 	r.HandleFunc("/api/auth/password-reset", h.RequestPasswordReset).Methods("POST")
 	r.HandleFunc("/api/auth/password-reset/confirm", h.ResetPassword).Methods("POST")
+	r.HandleFunc("/api/auth/verify-email", h.VerifyEmail).Methods("POST")
+	r.HandleFunc("/api/auth/resend-verification", h.ResendVerification).Methods("POST")
 
 	// protected routes
 	protected := r.PathPrefix("/api").Subrouter()
@@ -75,6 +77,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err == domain.ErrInvalidCredentials {
 			respondWithError(w, http.StatusUnauthorized, err.Error())
+			return
+		}
+		if err == domain.ErrEmailNotVerified {
+			respondWithError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		respondWithError(w, http.StatusInternalServerError, "Failed to login")
@@ -150,6 +156,46 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		respondWithError(w, http.StatusInternalServerError, "Failed to reset password")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, resp)
+}
+
+func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	var req domain.EmailVerificationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	resp, err := h.authService.VerifyEmail(r.Context(), &req)
+	if err != nil {
+		if err == domain.ErrInvalidVerificationToken || err == domain.ErrVerificationTokenExpired {
+			respondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		respondWithError(w, http.StatusInternalServerError, "Failed to verify email")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, resp)
+}
+
+func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request) {
+	var req domain.ResendVerificationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	resp, err := h.authService.ResendVerification(r.Context(), &req)
+	if err != nil {
+		if err == domain.ErrUserNotFound {
+			respondWithError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		respondWithError(w, http.StatusInternalServerError, "Failed to resend verification")
 		return
 	}
 

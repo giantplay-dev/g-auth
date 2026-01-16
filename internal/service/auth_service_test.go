@@ -81,6 +81,24 @@ func (m *MockUserRepository) ClearRefreshToken(ctx context.Context, userID uuid.
 	return args.Error(0)
 }
 
+func (m *MockUserRepository) UpdateVerificationToken(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) error {
+	args := m.Called(ctx, userID, token, expiresAt)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) GetByVerificationToken(ctx context.Context, token string) (*domain.User, error) {
+	args := m.Called(ctx, token)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.User), args.Error(1)
+}
+
+func (m *MockUserRepository) VerifyEmail(ctx context.Context, userID uuid.UUID) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
 func TestAuthService_RequestPasswordReset(t *testing.T) {
 	mockRepo := new(MockUserRepository)
 	jwtManager := jwt.NewJWTManager("test-secret", time.Hour, 7*24*time.Hour)

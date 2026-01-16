@@ -20,4 +20,7 @@ type UserRepository interface {
 	UpdateRefreshToken(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) error
 	GetByRefreshToken(ctx context.Context, token string) (*domain.User, error)
 	ClearRefreshToken(ctx context.Context, userID uuid.UUID) error
+	UpdateVerificationToken(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) error
+	GetByVerificationToken(ctx context.Context, token string) (*domain.User, error)
+	VerifyEmail(ctx context.Context, userID uuid.UUID) error
 }

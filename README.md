@@ -5,6 +5,7 @@ A modern, production-ready authentication service built with Go, featuring JWT-b
 ## 🚀 Features
 
 - **User Registration & Authentication**: Secure user registration and login with JWT tokens
+- **Email Verification**: Required email verification before login
 - **Password Reset**: Secure password reset functionality with email tokens
 - **Password Security**: bcrypt password hashing with proper salt rounds
 - **Clean Architecture**: Separation of concerns with domain, service, repository, and handler layers
@@ -264,7 +265,7 @@ For issues and questions, please open an issue in the repository.
 
 - [x] Add password reset functionality
 - [x] Implement refresh token mechanism
-- [ ] Add email verification
+- [x] Add email verification
 - [ ] Implement role-based access control (RBAC)
 - [ ] Add OAuth2 integration (Google, GitHub)
 - [ ] Add API rate limiting

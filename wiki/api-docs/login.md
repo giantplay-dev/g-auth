@@ -83,6 +83,7 @@ All error responses follow this format:
 | 200  | OK - Request succeeded |
 | 400  | Bad Request - Invalid request format |
 | 401  | Unauthorized - Missing or invalid authentication |
+| 403  | Forbidden - Email not verified |
 | 500  | Internal Server Error - Server error |
 
 **400 Bad Request** - Invalid request format:
@@ -96,6 +97,13 @@ All error responses follow this format:
 ```json
 {
   "error": "invalid credentials"
+}
+```
+
+**403 Forbidden** - Email not verified:
+```json
+{
+  "error": "email not verified"
 }
 ```
 

@@ -8,24 +8,30 @@ import (
 )
 
 var (
-	ErrUserNotFound       = errors.New("user not found")
-	ErrUserAlreadyExists  = errors.New("user already exists")
-	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrInvalidResetToken  = errors.New("invalid or expired reset token")
-	ErrResetTokenExpired  = errors.New("reset token has expired")
+	ErrUserNotFound             = errors.New("user not found")
+	ErrUserAlreadyExists        = errors.New("user already exists")
+	ErrInvalidCredentials       = errors.New("invalid credentials")
+	ErrInvalidResetToken        = errors.New("invalid or expired reset token")
+	ErrInvalidVerificationToken = errors.New("invalid or expired verification token")
+	ErrResetTokenExpired        = errors.New("reset token has expired")
+	ErrVerificationTokenExpired = errors.New("verification token has expired")
+	ErrEmailNotVerified         = errors.New("email not verified")
 )
 
 type User struct {
-	ID                    uuid.UUID  `json:"id"`
-	Email                 string     `json:"email"`
-	Password              string     `json:"-"`
-	Name                  string     `json:"name"`
-	ResetToken            *string    `json:"-"`
-	ResetTokenExpiresAt   *time.Time `json:"-"`
-	RefreshToken          *string    `json:"-"`
-	RefreshTokenExpiresAt *time.Time `json:"-"`
-	CreatedAt             time.Time  `json:"created_at"`
-	UpdatedAt             time.Time  `json:"updated_at"`
+	ID                         uuid.UUID  `json:"id"`
+	Email                      string     `json:"email"`
+	Password                   string     `json:"-"`
+	Name                       string     `json:"name"`
+	EmailVerified              bool       `json:"email_verified"`
+	VerificationToken          *string    `json:"-"`
+	VerificationTokenExpiresAt *time.Time `json:"-"`
+	ResetToken                 *string    `json:"-"`
+	ResetTokenExpiresAt        *time.Time `json:"-"`
+	RefreshToken               *string    `json:"-"`
+	RefreshTokenExpiresAt      *time.Time `json:"-"`
+	CreatedAt                  time.Time  `json:"created_at"`
+	UpdatedAt                  time.Time  `json:"updated_at"`
 }
 
 type LoginRequest struct {
@@ -41,6 +47,10 @@ type RegisterRequest struct {
 
 type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token"`
+}
+
+type RegisterResponse struct {
+	Message string `json:"message"`
 }
 
 type AuthResponse struct {
@@ -59,5 +69,21 @@ type PasswordResetConfirmRequest struct {
 }
 
 type PasswordResetResponse struct {
+	Message string `json:"message"`
+}
+
+type EmailVerificationRequest struct {
+	Token string `json:"token"`
+}
+
+type EmailVerificationResponse struct {
+	Message string `json:"message"`
+}
+
+type ResendVerificationRequest struct {
+	Email string `json:"email"`
+}
+
+type ResendVerificationResponse struct {
 	Message string `json:"message"`
 }

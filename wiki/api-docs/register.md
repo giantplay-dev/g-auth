@@ -44,15 +44,7 @@ Content-Type: application/json
 **Success Response** (201 Created):
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTIzZTQ1NjctZTg5Yi0xMmQzLWE0NTYtNDI2NjE0MTc0MDAwIiwiZXhwIjoxNzM2NTA1NjAwfQ.abc123...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTIzZTQ1NjctZTg5Yi0xMmQzLWE0NTYtNDI2NjE0MTc0MDAwIiwiZXhwIjoxNzM3MTEwNDAwfQ.def456...",
-  "user": {
-    "id": "123e4567-e89b-12d3-a456-426614174000",
-    "email": "user@example.com",
-    "name": "John Doe",
-    "created_at": "2026-01-10T10:00:00Z",
-    "updated_at": "2026-01-10T10:00:00Z"
-  }
+  "message": "Registration successful. Please check your email to verify your account."
 }
 ```
 
@@ -60,13 +52,7 @@ Content-Type: application/json
 
 | Field | Type | Description |
 |-------|------|-------------|
-| token | string | JWT access token (15 minutes expiration) |
-| refresh_token | string | JWT refresh token (7 days expiration) |
-| user.id | string (UUID) | Unique user identifier |
-| user.email | string | User's email address |
-| user.name | string | User's full name |
-| user.created_at | string (ISO 8601) | Account creation timestamp |
-| user.updated_at | string (ISO 8601) | Last update timestamp |
+| message | string | Confirmation message indicating registration was successful and verification email was sent |
 
 ## Error Responses
 

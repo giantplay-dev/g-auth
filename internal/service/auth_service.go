@@ -30,7 +30,7 @@ func NewAuthService(userRepo repository.UserRepository, jwtManager *jwt.JWTManag
 	}
 }
 
-func (s *AuthService) Register(ctx context.Context, req *domain.RegisterRequest) (*domain.AuthResponse, error) {
+func (s *AuthService) Register(ctx context.Context, req *domain.RegisterRequest) (*domain.RegisterResponse, error) {
 	// check if user already exists
 	existingUser, err := s.userRepo.GetByEmail(ctx, req.Email)
 	if err != nil && !errors.Is(err, domain.ErrUserNotFound) {
@@ -48,37 +48,38 @@ func (s *AuthService) Register(ctx context.Context, req *domain.RegisterRequest)
 
 	// create user
 	user := &domain.User{
-		Email:    req.Email,
-		Password: hashedPassword,
-		Name:     req.Name,
+		Email:         req.Email,
+		Password:      hashedPassword,
+		Name:          req.Name,
+		EmailVerified: false,
 	}
 
 	if err := s.userRepo.Create(ctx, user); err != nil {
 		return nil, err
 	}
 
-	// generate tokens
-	token, err := s.jwtManager.Generate(user.ID, user.Email)
+	// generate verification token
+	verificationToken, err := s.generateToken()
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := s.jwtManager.GenerateRefreshToken(user.ID)
+	// set verification token with expiration (24 hours)
+	expiresAt := time.Now().Add(24 * time.Hour)
+	err = s.userRepo.UpdateVerificationToken(ctx, user.ID, verificationToken, expiresAt)
 	if err != nil {
 		return nil, err
 	}
 
-	// store refresh token
-	refreshExpiresAt := time.Now().Add(7 * 24 * time.Hour) // 7 days
-	err = s.userRepo.UpdateRefreshToken(ctx, user.ID, refreshToken, refreshExpiresAt)
+	// send verification email
+	err = s.sendVerificationEmail(user.Email, verificationToken)
 	if err != nil {
-		return nil, err
+		// log error but don't fail registration
+		// in production, you might want to handle this differently
 	}
 
-	return &domain.AuthResponse{
-		Token:        token,
-		RefreshToken: refreshToken,
-		User:         *user,
+	return &domain.RegisterResponse{
+		Message: "Registration successful. Please check your email to verify your account.",
 	}, nil
 
 }
@@ -96,6 +97,11 @@ func (s *AuthService) Login(ctx context.Context, req *domain.LoginRequest) (*dom
 	// verify password
 	if !password.Verify(req.Password, user.Password) {
 		return nil, domain.ErrInvalidCredentials
+	}
+
+	// check if email is verified
+	if !user.EmailVerified {
+		return nil, domain.ErrEmailNotVerified
 	}
 
 	// generate tokens
@@ -299,4 +305,120 @@ func (s *AuthService) buildPasswordResetEmail(name, resetLink string) string {
 </body>
 </html>
 `
+}
+
+func (s *AuthService) VerifyEmail(ctx context.Context, req *domain.EmailVerificationRequest) (*domain.EmailVerificationResponse, error) {
+	// get user by verification token
+	user, err := s.userRepo.GetByVerificationToken(ctx, req.Token)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return nil, domain.ErrInvalidVerificationToken
+		}
+		return nil, err
+	}
+
+	// check if token is expired
+	if user.VerificationTokenExpiresAt != nil && time.Now().After(*user.VerificationTokenExpiresAt) {
+		return nil, domain.ErrVerificationTokenExpired
+	}
+
+	// verify email
+	err = s.userRepo.VerifyEmail(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.EmailVerificationResponse{
+		Message: "Email verified successfully. You can now log in.",
+	}, nil
+}
+
+func (s *AuthService) ResendVerification(ctx context.Context, req *domain.ResendVerificationRequest) (*domain.ResendVerificationResponse, error) {
+	// get user by email
+	user, err := s.userRepo.GetByEmail(ctx, req.Email)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return nil, domain.ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	// check if already verified
+	if user.EmailVerified {
+		return &domain.ResendVerificationResponse{
+			Message: "Email is already verified.",
+		}, nil
+	}
+
+	// generate new verification token
+	verificationToken, err := s.generateToken()
+	if err != nil {
+		return nil, err
+	}
+
+	// set verification token with expiration (24 hours)
+	expiresAt := time.Now().Add(24 * time.Hour)
+	err = s.userRepo.UpdateVerificationToken(ctx, user.ID, verificationToken, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+
+	// send verification email
+	err = s.sendVerificationEmail(user.Email, verificationToken)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.ResendVerificationResponse{
+		Message: "Verification email sent successfully.",
+	}, nil
+}
+
+func (s *AuthService) generateToken() (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
+func (s *AuthService) sendVerificationEmail(email, token string) error {
+	verificationLink := "http://localhost:8080/api/v1/auth/verify-email?token=" + token // adjust URL as needed
+
+	subject := "Verify Your Email Address"
+	htmlBody := `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Verify Your Email</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background: #f8f9fa; padding: 30px; border-radius: 10px;">
+        <h2 style="color: #007bff; margin-bottom: 20px;">Verify Your Email Address</h2>
+        
+        <p>Hello,</p>
+        
+        <p>Thank you for registering with our service. To complete your registration, please verify your email address by clicking the button below:</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="` + verificationLink + `" style="background-color: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email</a>
+        </div>
+        
+        <p><strong>Important:</strong> This link will expire in 24 hours for security reasons.</p>
+        
+        <p>If the button above doesn't work, you can copy and paste this link into your browser:</p>
+        <p style="word-break: break-all; color: #666;">` + verificationLink + `</p>
+        
+        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+        
+        <p style="color: #666; font-size: 12px;">
+            This is an automated email. Please do not reply to this message.
+        </p>
+    </div>
+</body>
+</html>
+`
+
+	return s.mailer.SendEmail(email, subject, htmlBody)
 }
