@@ -371,7 +371,7 @@ For issues and questions, please open an issue in the repository.
 
 - [ ] Unit tests
 - [ ] Integration tests
-- [ ] E2E tests
+- [x] E2E tests
 - [ ] Coverage enforcement
 - [ ] Linting & formatting
 - [ ] Dependency vulnerability scanning
