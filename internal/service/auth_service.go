@@ -46,6 +46,11 @@ func (s *AuthService) Register(ctx context.Context, req *domain.RegisterRequest)
 		return nil, domain.ErrUserAlreadyExists
 	}
 
+	// enforce password policy
+	if err := password.ValidateDefault(req.Password); err != nil {
+		return nil, err
+	}
+
 	// hash password
 	hashedPassword, err := password.Hash(req.Password)
 	if err != nil {
@@ -314,6 +319,11 @@ func (s *AuthService) ResetPassword(ctx context.Context, req *domain.PasswordRes
 	// check if token is expired
 	if user.ResetTokenExpiresAt == nil || user.ResetTokenExpiresAt.Before(time.Now()) {
 		return nil, domain.ErrResetTokenExpired
+	}
+
+	// enforce password policy
+	if err := password.ValidateDefault(req.Password); err != nil {
+		return nil, err
 	}
 
 	// hash new password

@@ -11,6 +11,7 @@ import (
 	"g-auth/internal/domain"
 	"g-auth/internal/middleware"
 	"g-auth/internal/service"
+	"g-auth/pkg/password"
 )
 
 type AuthHandler struct {
@@ -59,6 +60,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err == domain.ErrUserAlreadyExists {
 			respondWithError(w, http.StatusConflict, err.Error())
+			return
+		}
+		if _, ok := err.(password.ErrWeakPassword); ok {
+			respondWithError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		// log error
@@ -173,6 +178,10 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	resp, err := h.authService.ResetPassword(r.Context(), &req)
 	if err != nil {
 		if err == domain.ErrInvalidResetToken || err == domain.ErrResetTokenExpired {
+			respondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if _, ok := err.(password.ErrWeakPassword); ok {
 			respondWithError(w, http.StatusBadRequest, err.Error())
 			return
 		}

@@ -324,7 +324,7 @@ For issues and questions, please open an issue in the repository.
 - [x] RBAC
 
 - [ ] Audit logging
-- [ ] Password policy enforcement
+- [x] Password policy enforcement
 - [ ] Refresh token rotation
 - [ ] Token revocation
 - [ ] Session & device management
