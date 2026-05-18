@@ -313,20 +313,87 @@ For issues and questions, please open an issue in the repository.
 
 ## 🗺️ Roadmap
 
-- [x] Add password reset functionality
-- [x] Implement refresh token mechanism
-- [x] Add email verification
-- [x] Add API rate limiting
-- [x] Implement account lockout after failed attempts
-- [x] Implement multi-factor authentication (MFA) using email
-- [x] Implement role-based access control (RBAC)
-- [ ] Implement audit logging for all authentication events (login, logout, failures)
-- [ ] Add GDPR compliance features (e.g., data export, account deletion requests)
-- [ ] Add password strength policies and enforcement during registration/reset
-- [ ] Implement session management with device tracking and forced logout
-- [ ] Implement graceful shutdown
-- [ ] Add user profile management (e.g., update email, password, personal details)
-- [ ] Add comprehensive API documentation with Swagger
+### 🔐 Authentication & Security
+
+- [x] Password reset
+- [x] Refresh token
+- [x] Email verification
+- [x] API rate limiting
+- [x] Account lockout
+- [x] MFA
+- [x] RBAC
+
+- [ ] Audit logging
+- [ ] Password policy enforcement
+- [ ] Refresh token rotation
+- [ ] Token revocation
+- [ ] Session & device management
+- [ ] Suspicious activity detection
+- [ ] Security headers & hardening
+- [ ] Secrets management
+
+---
+
+### 🧱 Infrastructure & Reliability
+
+- [ ] Graceful shutdown
+- [ ] Health/readiness/liveness checks
+- [ ] Structured logging
+- [ ] Monitoring & alerting
+- [ ] Distributed tracing
+- [ ] Database migrations
+- [ ] Backup & disaster recovery
+- [ ] Zero-downtime deployment
+- [ ] Resource limits & autoscaling
+- [ ] Container security hardening
+
+---
+
+### 🌐 API & Platform
+
+- [ ] Swagger/OpenAPI documentation
+- [ ] API versioning
+- [ ] Idempotency support
+- [ ] User profile management
+- [ ] GDPR compliance
+
+---
+
+### ⚙️ Background Processing
+
+- [ ] Background jobs & queues
+- [ ] Retry & dead-letter queue support
+- [ ] Scheduled jobs
+
+---
+
+### 🧪 Testing & Quality
+
+- [ ] Unit tests
+- [ ] Integration tests
+- [ ] E2E tests
+- [ ] Coverage enforcement
+- [ ] Linting & formatting
+- [ ] Dependency vulnerability scanning
+
+---
+
+### 🚀 CI/CD & DevOps
+
+- [ ] CI/CD pipeline
+- [ ] Automated Docker builds
+- [ ] Deployment automation
+- [ ] Rollback strategy
+- [ ] Semantic versioning
+
+---
+
+### 📚 Documentation
+
+- [ ] Architecture documentation
+- [ ] API documentation
+- [ ] Deployment documentation
+- [ ] Incident runbooks
 
 ## 📖 Additional Documentation
 
